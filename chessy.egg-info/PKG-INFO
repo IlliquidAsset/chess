@@ -1,0 +1,31 @@
+Metadata-Version: 2.2
+Name: chessy
+Version: 0.1.0
+Summary: A web application for analyzing Chess.com games
+Home-page: https://github.com/yourusername/chessy
+Author: Chess.com Game Analyzer
+Author-email: your.email@example.com
+Keywords: chess,analysis,stockfish,flask
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: End Users/Desktop
+Classifier: Topic :: Games/Entertainment :: Board Games
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Requires-Python: >=3.8
+Requires-Dist: flask>=2.0.0
+Requires-Dist: requests>=2.25.0
+Requires-Dist: python-dotenv>=0.15.0
+Requires-Dist: python-chess>=1.5.0
+Requires-Dist: pandas>=1.2.0
+Requires-Dist: plotly>=5.0.0
+Requires-Dist: stockfish>=3.19.0
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary

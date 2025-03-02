@@ -1,0 +1,2 @@
+[console_scripts]
+chessy-server = chessy.server:main
