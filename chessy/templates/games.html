@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chessy - Game List</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <span class="chessy-logo">♟️ Chessy</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/games">Games</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/openings">Openings</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <h1>Game List</h1>
+        <p class="lead">Your Chess.com game history</p>
+        
+        {% if not games %}
+            <div class="alert alert-warning">
+                <h4 class="alert-heading">No Games Found</h4>
+                <p>No game data has been downloaded yet. Return to the <a href="/">Dashboard</a> to download your games.</p>
+            </div>
+        {% else %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>{{ games|length }} Games</span>
+                        <div>
+                            <input type="text" id="gameSearch" class="form-control form-control-sm" placeholder="Search games...">
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>White</th>
+                                    <th>Black</th>
+                                    <th>Result</th>
+                                    <th>ECO</th>
+                                    <th>Time Control</th>
+                                    <th>Moves</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for game in games %}
+                                <tr>
+                                    <td>{{ game.date }}</td>
+                                    <td>
+                                        {% if game.PlayedAs == "White" %}
+                                        <strong>{{ game.white }}</strong>
+                                        {% else %}
+                                        {{ game.white }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if game.PlayedAs == "Black" %}
+                                        <strong>{{ game.black }}</strong>
+                                        {% else %}
+                                        {{ game.black }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if game.Result == "1-0" and game.PlayedAs == "White" or game.Result == "0-1" and game.PlayedAs == "Black" %}
+                                        <span class="badge bg-success">Win</span>
+                                        {% elif game.Result == "1/2-1/2" %}
+                                        <span class="badge bg-secondary">Draw</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">Loss</span>
+                                        {% endif %}
+                                        {{ game.Result }}
+                                    </td>
+                                    <td><span class="eco-code">{{ game.ECO }}</span></td>
+                                    <td>{{ game.TimeControl }}</td>
+                                    <td>{{ game.NumMoves }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Simple search functionality
+        document.getElementById('gameSearch').addEventListener('keyup', function() {
+            let searchText = this.value.toLowerCase();
+            let tableRows = document.querySelectorAll('tbody tr');
+            
+            tableRows.forEach(row => {
+                let textContent = row.textContent.toLowerCase();
+                row.style.display = textContent.includes(searchText) ? '' : 'none';
+            });
+        });
+    </script>
+</body>
+</html>

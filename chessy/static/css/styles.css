@@ -1,0 +1,129 @@
+/* Main Styles for Chessy Web Interface */
+
+:root {
+  --chess-light: #f0d9b5;
+  --chess-dark: #b58863;
+  --chess-accent: #3d85c6;
+  --chess-highlight: #ffcc00;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f8f9fa;
+  color: #212529;
+}
+
+/* Navbar styling */
+.navbar {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.chessy-logo {
+  font-weight: bold;
+  font-size: 1.3rem;
+}
+
+/* Card styling */
+.card {
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  margin-bottom: 20px;
+  border: none;
+}
+
+.card-header {
+  background-color: #fff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+  padding: 1rem 1.25rem;
+}
+
+.stats-card {
+  transition: transform 0.2s;
+}
+
+.stats-card:hover {
+  transform: translateY(-5px);
+}
+
+/* Table styling */
+.table th {
+  background-color: var(--chess-light);
+  border-color: var(--chess-dark);
+}
+
+.table-hover tbody tr:hover {
+  background-color: rgba(240, 217, 181, 0.2);
+}
+
+/* Chart containers */
+.chart-container {
+  width: 100%;
+  height: 400px;
+}
+
+/* Opening statistics */
+.eco-code {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  padding: 2px 6px;
+  background-color: #eee;
+  border-radius: 4px;
+}
+
+/* Performance indicators */
+.performance-good {
+  color: #28a745;
+}
+
+.performance-neutral {
+  color: #6c757d;
+}
+
+.performance-bad {
+  color: #dc3545;
+}
+
+/* Chess piece icons */
+.chess-piece {
+  font-size: 1.5rem;
+  margin-right: 0.5rem;
+}
+
+/* Badge styling */
+.badge-win {
+  background-color: #28a745;
+}
+
+.badge-loss {
+  background-color: #dc3545;
+}
+
+.badge-draw {
+  background-color: #6c757d;
+}
+
+.badge-eco {
+  background-color: var(--chess-accent);
+}
+
+/* Button styling */
+.btn-primary {
+  background-color: var(--chess-accent);
+  border-color: var(--chess-accent);
+}
+
+.btn-primary:hover {
+  background-color: #2d6da3;
+  border-color: #2d6da3;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .stats-card {
+    margin-bottom: 15px;
+  }
+  
+  .chart-container {
+    height: 300px;
+  }
+}

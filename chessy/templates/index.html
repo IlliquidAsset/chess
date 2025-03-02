@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chessy Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <span class="chessy-logo">♟️ Chessy</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/games">Games</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/openings">Openings</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Dashboard Header -->
+        <div class="row mb-4">
+            <div class="col">
+                <h1>Chess.com Game Analysis</h1>
+                <p class="lead">Welcome to your personal Chess.com game analysis dashboard for <strong>{{ username }}</strong></p>
+            </div>
+        </div>
+
+        <!-- Actions Section -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex gap-2">
+                            <form action="/download" method="post">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-download"></i> Download New Games
+                                </button>
+                            </form>
+                            <form action="/analyze" method="post">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="bi bi-graph-up"></i> Analyze Games
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if not has_data %}
+        <!-- No Data Message -->
+        <div class="row">
+            <div class="col">
+                <div class="alert alert-warning">
+                    <h4 class="alert-heading">No Game Data Found</h4>
+                    <p>It looks like you haven't downloaded any games yet. Click the "Download New Games" button above to fetch your Chess.com games.</p>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <!-- Statistics Summary -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stats-card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Games</h5>
+                        <h2 class="display-4">{{ stats.total_games }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card text-center text-success">
+                    <div class="card-body">
+                        <h5 class="card-title">Wins</h5>
+                        <h2 class="display-4">{{ stats.wins }}</h2>
+                        <p class="mb-0">{{ stats.win_percentage }}%</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card text-center text-danger">
+                    <div class="card-body">
+                        <h5 class="card-title">Losses</h5>
+                        <h2 class="display-4">{{ stats.losses }}</h2>
+                        <p class="mb-0">{{ (stats.losses / stats.total_games * 100)|round(1) if stats.total_games > 0 else 0 }}%</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card text-center text-primary">
+                    <div class="card-body">
+                        <h5 class="card-title">Draws</h5>
+                        <h2 class="display-4">{{ stats.draws }}</h2>
+                        <p class="mb-0">{{ (stats.draws / stats.total_games * 100)|round(1) if stats.total_games > 0 else 0 }}%</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Win Rate by Time Control -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Win Rate by Time Control</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="win_rate_chart" style="height: 300px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Blunders Analysis -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Mistakes Overview</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Blunders
+                                <span class="badge bg-danger rounded-pill">{{ stats.blunders }}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Inaccuracies
+                                <span class="badge bg-warning rounded-pill">{{ stats.inaccuracies }}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Avg. Blunders per Game
+                                <span class="badge bg-info rounded-pill">{{ (stats.blunders / stats.total_games)|round(2) if stats.total_games > 0 else 0 }}</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Recent Activity</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Last updated: <span id="last_update"></span></p>
+                        <p>See more details in the <a href="/games">Games</a> and <a href="/openings">Openings</a> sections.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+    
+    {% if has_data %}
+    <script>
+        // Load win rate chart data
+        fetch("/api/charts/win_rate")
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error("Error loading chart data:", data.error);
+                return;
+            }
+            
+            const timeControls = data.map(d => d.timeControl);
+            const winRates = data.map(d => d.winRate);
+            const games = data.map(d => d.games);
+            
+            const trace = {
+                x: timeControls,
+                y: winRates,
+                type: 'bar',
+                text: games.map(g => `${g} games`),
+                marker: {
+                    color: 'rgba(50, 171, 96, 0.7)'
+                }
+            };
+            
+            const layout = {
+                title: 'Win Rate by Time Control',
+                xaxis: {
+                    title: 'Time Control'
+                },
+                yaxis: {
+                    title: 'Win Rate (%)',
+                    range: [0, 100]
+                },
+                margin: {
+                    l: 50,
+                    r: 50,
+                    b: 50,
+                    t: 50,
+                    pad: 4
+                }
+            };
+            
+            Plotly.newPlot('win_rate_chart', [trace], layout);
+        })
+        .catch(error => {
+            console.error("Error loading chart:", error);
+        });
+        
+        // Get last update time
+        fetch("/api/game_data")
+        .then(response => response.json())
+        .then(data => {
+            if (data.length > 0) {
+                // Get the most recent game date
+                const dates = data.map(g => g.date).filter(d => d && d !== "????-??-??");
+                if (dates.length > 0) {
+                    const lastDate = new Date(dates.sort().pop());
+                    document.getElementById("last_update").textContent = lastDate.toLocaleDateString();
+                } else {
+                    document.getElementById("last_update").textContent = "Unknown";
+                }
+            }
+        })
+        .catch(error => {
+            console.error("Error loading data:", error);
+        });
+    </script>
+    {% endif %}
+</body>
+</html>

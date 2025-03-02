@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chessy - Opening Statistics</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <span class="chessy-logo">♟️ Chessy</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/games">Games</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/openings">Openings</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <h1>Opening Statistics</h1>
+        <p class="lead">Performance by ECO code</p>
+        
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Performance by Opening (White)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="white_openings_chart" style="height: 400px;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-12">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Performance by Opening (Black)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="black_openings_chart" style="height: 400px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Opening Statistics</h5>
+                    <div>
+                        <input type="text" id="ecoSearch" class="form-control form-control-sm" placeholder="Search ECO codes...">
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>ECO</th>
+                                <th>White Games</th>
+                                <th>White W/D/L</th>
+                                <th>White Win %</th>
+                                <th>Black Games</th>
+                                <th>Black W/D/L</th>
+                                <th>Black Win %</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for eco in eco_data %}
+                            <tr>
+                                <td><span class="eco-code">{{ eco.ECO }}</span></td>
+                                <td>{{ eco.White_Games }}</td>
+                                <td>{{ eco.White_Wins }}/{{ eco.White_Draws }}/{{ eco.White_Losses }}</td>
+                                <td>
+                                    {% if eco.White_Games|int > 0 %}
+                                    {% set win_pct = (eco.White_Wins|int / eco.White_Games|int * 100)|round(1) %}
+                                    <span class="{% if win_pct >= 60 %}performance-good{% elif win_pct >= 40 %}performance-neutral{% else %}performance-bad{% endif %}">
+                                        {{ win_pct }}%
+                                    </span>
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                                <td>{{ eco.Black_Games }}</td>
+                                <td>{{ eco.Black_Wins }}/{{ eco.Black_Draws }}/{{ eco.Black_Losses }}</td>
+                                <td>
+                                    {% if eco.Black_Games|int > 0 %}
+                                    {% set win_pct = (eco.Black_Wins|int / eco.Black_Games|int * 100)|round(1) %}
+                                    <span class="{% if win_pct >= 60 %}performance-good{% elif win_pct >= 40 %}performance-neutral{% else %}performance-bad{% endif %}">
+                                        {{ win_pct }}%
+                                    </span>
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                                <td>{{ eco.Total_Games }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Fetch ECO data for charts
+        fetch('/api/eco_data')
+            .then(response => response.json())
+            .then(data => {
+                // Filter out empty ECOs and sort by total games
+                const filteredData = data.filter(eco => eco.ECO !== "" && eco.ECO !== "Unknown")
+                    .sort((a, b) => parseInt(b.Total_Games) - parseInt(a.Total_Games));
+                
+                // Top 10 openings by game count
+                const topECOs = filteredData.slice(0, 10);
+                
+                // Create White openings chart
+                const whiteData = topECOs.map(eco => {
+                    const wins = parseInt(eco.White_Wins);
+                    const draws = parseInt(eco.White_Draws);
+                    const losses = parseInt(eco.White_Losses);
+                    const total = parseInt(eco.White_Games);
+                    
+                    return {
+                        eco: eco.ECO,
+                        winPct: total > 0 ? (wins / total * 100) : 0,
+                        drawPct: total > 0 ? (draws / total * 100) : 0,
+                        lossPct: total > 0 ? (losses / total * 100) : 0,
+                        total: total
+                    };
+                });
+                
+                // Filter out ECOs with no white games
+                const filteredWhiteData = whiteData.filter(d => d.total > 0)
+                    .sort((a, b) => b.total - a.total)
+                    .slice(0, 10);
+                
+                if (filteredWhiteData.length > 0) {
+                    const whiteTraces = [
+                        {
+                            x: filteredWhiteData.map(d => d.eco),
+                            y: filteredWhiteData.map(d => d.winPct),
+                            name: 'Wins',
+                            type: 'bar',
+                            marker: {
+                                color: 'rgba(50, 171, 96, 0.7)'
+                            }
+                        },
+                        {
+                            x: filteredWhiteData.map(d => d.eco),
+                            y: filteredWhiteData.map(d => d.drawPct),
+                            name: 'Draws',
+                            type: 'bar',
+                            marker: {
+                                color: 'rgba(128, 128, 128, 0.7)'
+                            }
+                        },
+                        {
+                            x: filteredWhiteData.map(d => d.eco),
+                            y: filteredWhiteData.map(d => d.lossPct),
+                            name: 'Losses',
+                            type: 'bar',
+                            marker: {
+                                color: 'rgba(219, 64, 82, 0.7)'
+                            }
+                        }
+                    ];
+                    
+                    const whiteLayout = {
+                        barmode: 'stack',
+                        title: 'Performance with White Pieces',
+                        xaxis: {
+                            title: 'ECO Code'
+                        },
+                        yaxis: {
+                            title: 'Percentage',
+                            range: [0, 100]
+                        }
+                    };
+                    
+                    Plotly.newPlot('white_openings_chart', whiteTraces, whiteLayout);
+                }
+                
+                // Create Black openings chart
+                const blackData = topECOs.map(eco => {
+                    const wins = parseInt(eco.Black_Wins);
+                    const draws = parseInt(eco.Black_Draws);
+                    const losses = parseInt(eco.Black_Losses);
+                    const total = parseInt(eco.Black_Games);
+                    
+                    return {
+                        eco: eco.ECO,
+                        winPct: total > 0 ? (wins / total * 100) : 0,
+                        drawPct: total > 0 ? (draws / total * 100) : 0,
+                        lossPct: total > 0 ? (losses / total * 100) : 0,
+                        total: total
+                    };
+                });
+                
+                // Filter out ECOs with no black games
+                const filteredBlackData = blackData.filter(d => d.total > 0)
+                    .sort((a, b) => b.total - a.total)
+                    .slice(0, 10);
+                
+                if (filteredBlackData.length > 0) {
+                    const blackTraces = [
+                        {
+                            x: filteredBlackData.map(d => d.eco),
+                            y: filteredBlackData.map(d => d.winPct),
+                            name: 'Wins',
+                            type: 'bar',
+                            marker: {
+                                color: 'rgba(50, 171, 96, 0.7)'
+                            }
+                        },
+                        {
+                            x: filteredBlackData.map(d => d.eco),
+                            y: filteredBlackData.map(d => d.drawPct),
+                            name: 'Draws',
+                            type: 'bar',
+                            marker: {
+                                color: 'rgba(128, 128, 128, 0.7)'
+                            }
+                        },
+                        {
+                            x: filteredBlackData.map(d => d.eco),
+                            y: filteredBlackData.map(d => d.lossPct),
+                            name: 'Losses',
+                            type: 'bar',
+                            marker: {
+                                color: 'rgba(219, 64, 82, 0.7)'
+                            }
+                        }
+                    ];
+                    
+                    const blackLayout = {
+                        barmode: 'stack',
+                        title: 'Performance with Black Pieces',
+                        xaxis: {
+                            title: 'ECO Code'
+                        },
+                        yaxis: {
+                            title: 'Percentage',
+                            range: [0, 100]
+                        }
+                    };
+                    
+                    Plotly.newPlot('black_openings_chart', blackTraces, blackLayout);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching ECO data:', error);
+            });
+        
+        // Simple search functionality
+        document.getElementById('ecoSearch').addEventListener('keyup', function() {
+            let searchText = this.value.toLowerCase();
+            let tableRows = document.querySelectorAll('tbody tr');
+            
+            tableRows.forEach(row => {
+                let textContent = row.textContent.toLowerCase();
+                row.style.display = textContent.includes(searchText) ? '' : 'none';
+            });
+        });
+    </script>
+</body>
+</html>
