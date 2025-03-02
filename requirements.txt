@@ -1,4 +1,19 @@
-requests
-python-dotenv
-python-chess
-stockfish
+# Core dependencies
+flask>=2.0.0
+requests>=2.25.0
+python-dotenv>=0.15.0
+python-chess>=1.5.0
+
+# Data processing
+pandas>=1.2.0
+numpy>=1.20.0
+
+# Visualization
+plotly>=5.0.0
+
+# Chess analysis
+stockfish>=3.19.0
+
+# Additional utilities
+csv>=1.0
+json>=2.0.9
