@@ -1,8 +1,24 @@
+cat > .gitignore << 'EOF'
+# Exclude sensitive data
 .env
-*.pgn
-last_downloaded.txt
-/output/games
-/output/analysis
-/output/logs
-/output__pycache__/
+
+# Exclude Python cache files
+__pycache__/
 *.pyc
+
+# Exclude output files while keeping folders
+/output/*
+!/output/games/
+!/output/analysis/
+!/output/logs/
+
+# Exclude contents of subdirectories 
+/output/games/*
+/output/analysis/*
+/output/logs/*
+
+# Include placeholder files to maintain directory structure
+!/output/games/.gitkeep
+!/output/analysis/.gitkeep
+!/output/logs/.gitkeep
+EOF
