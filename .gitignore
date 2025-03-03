@@ -4,4 +4,5 @@ last_downloaded.txt
 /output/games
 /output/analysis
 /output/logs
-/output
+/output__pycache__/
+*.pyc
