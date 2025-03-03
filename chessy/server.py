@@ -323,8 +323,7 @@ def index():
         task_status=task_status
     )
 
-@app.route("/download", methods=["POST"])
-def download_games():
+
     """Download games from Chess.com."""
     if not chessy_service:
         flash("Service not available. Check configuration and try again.", "error")
@@ -353,8 +352,104 @@ def download_games():
     flash("Download started in background. Refresh page to check status.", "info")
     return redirect(url_for("index"))
 
+@app.route("/download", methods=["POST"])
+def download_games():
+    """Download games from Chess.com."""
+    if not chessy_service:
+        if request.is_json:
+            return jsonify({
+                "status": "error",
+                "message": "Service not available. Check configuration and try again."
+            })
+        flash("Service not available. Check configuration and try again.", "error")
+        return redirect(url_for("index"))
+        
+    if background_tasks['download']['running']:
+        if request.is_json:
+            return jsonify({
+                "status": "warning",
+                "message": "Download already in progress. Please wait."
+            })
+        flash("Download already in progress. Please wait.", "warning")
+        return redirect(url_for("index"))
+        
+    # Start background download
+    thread = threading.Thread(
+        target=download_thread, 
+        args=(app.app_context(),)
+    )
+    thread.daemon = True
+    thread.start()
+    
+    # For AJAX requests, return JSON
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            "status": "success",
+            "message": "Download started in background",
+            "taskId": "download"
+        })
+    
+    # For form submissions, redirect with flash message
+    flash("Download started in background. Refresh page to check status.", "info")
+    return redirect(url_for("index"))
+
 @app.route("/analyze", methods=["POST"])
 def analyze_games():
+    """Analyze games with Stockfish."""
+    if not chessy_service:
+        if request.is_json:
+            return jsonify({
+                "status": "error",
+                "message": "Service not available. Check configuration and try again."
+            })
+        flash("Service not available. Check configuration and try again.", "error")
+        return redirect(url_for("index"))
+        
+    if background_tasks['analyze']['running']:
+        if request.is_json:
+            return jsonify({
+                "status": "warning",
+                "message": "Analysis already in progress. Please wait."
+            })
+        flash("Analysis already in progress. Please wait.", "warning")
+        return redirect(url_for("index"))
+    
+    # Verify we have games data to analyze
+    if not os.path.exists(PARSED_GAMES_FILE) or os.path.getsize(PARSED_GAMES_FILE) <= 5:  # Just contains [] or empty
+        if request.is_json:
+            return jsonify({
+                "status": "error",
+                "message": "No game data available. Please download games first."
+            })
+        flash("No game data available. Please download games first.", "error")
+        return redirect(url_for("index"))
+        
+    # Start background analysis
+    thread = threading.Thread(
+        target=analyze_thread, 
+        args=(app.app_context(),)
+    )
+    thread.daemon = True
+    thread.start()
+    
+    # For AJAX requests, return JSON
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            "status": "success",
+            "message": "Analysis started in background",
+            "taskId": "analyze"
+        })
+    
+    # For form submissions, redirect with flash message
+    flash("Analysis started in background. Refresh page to check status.", "info")
+    return redirect(url_for("index"))
+
+@app.route("/errors/download")
+def download_error():
+    """Display download error page."""
+    return render_template("errors/download.html", username=USERNAME)
+
+
     """Analyze games with Stockfish."""
     if not chessy_service:
         flash("Service not available. Check configuration and try again.", "error")
@@ -556,11 +651,6 @@ def inaccuracies():
         common_phase=common_phase,
         inaccuracy_games=inaccuracy_games
     )
-
-@app.route("/errors/download")
-def download_error():
-    """Display download error page."""
-    return render_template("errors/download.html", username=USERNAME)
 
 @app.route("/errors/analysis")
 def analysis_error():
@@ -1060,6 +1150,738 @@ def get_all_eco_codes():
         emoji_log(logger, logging.ERROR, f"Error retrieving ECO descriptions: {str(e)}", "❌")
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/notifications")
+def get_notifications():
+    """Endpoint for retrieving pending notifications."""
+    notifications = get_pending_notifications()
+    return jsonify(notifications)
+
+@app.route("/api/task_history/<task_type>")
+def task_history(task_type):
+    """Get history of a specific task type."""
+    if task_type not in ['download', 'analyze']:
+        return jsonify({"error": "Invalid task type"}), 400
+        
+    history_file = os.path.join(OUTPUT_DIR, f"{task_type}_history.json")
+    if not os.path.exists(history_file):
+        return jsonify([])
+        
+    try:
+        with open(history_file, "r") as f:
+            history = json.load(f)
+        return jsonify(history)
+    except Exception as e:
+        emoji_log(logger, logging.ERROR, f"Error loading task history: {str(e)}", "❌")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/cancel_task/<task_type>", methods=["POST"])
+def cancel_task(task_type):
+    """Cancel a running background task (preparation for interruptible analysis)."""
+    if task_type not in ['download', 'analyze']:
+        return jsonify({"error": "Invalid task type"}), 400
+        
+    if not background_tasks[task_type]['running']:
+        return jsonify({"error": "Task is not running"}), 400
+        
+    # Mark task for cancellation
+    # Note: Full implementation requires making the tasks check for cancellation
+    background_tasks[task_type]['cancel_requested'] = True
+    
+    return jsonify({
+        "status": "success",
+        "message": f"Cancellation requested for {task_type} task"
+    })
+
+@app.route("/api/task_status")
+def get_all_task_status():
+    """Get status of all background tasks."""
+    status = {}
+    
+    for task_type in ['download', 'analyze']:
+        task_data = background_tasks[task_type]
+        status[task_type] = {
+            'running': task_data.get('running', False),
+            'status': task_data.get('status', None),
+            'percentage': task_data.get('percentage', 0),
+            'current': task_data.get('current', 0),
+            'total': task_data.get('total', 0),
+            'elapsed_seconds': task_data.get('elapsed_seconds', 0),
+            'last_message': task_data.get('messages', [])[-1] if task_data.get('messages') else None
+        }
+    
+    return jsonify(status)
+
+################################################################################
+# III. BACKGROUND TASKS
+################################################################################
+def download_thread(app_context):
+    """Background thread for downloading games."""
+    with app_context:
+        try:
+            background_tasks['download']['running'] = True
+            background_tasks['download']['status'] = "Running"
+            background_tasks['download']['messages'] = ["Starting download..."]
+            background_tasks['download']['start_time'] = datetime.datetime.now()
+            background_tasks['download']['total'] = 0
+            background_tasks['download']['current'] = 0
+            background_tasks['download']['percentage'] = 0
+            
+            # Trigger game download
+            background_tasks['download']['messages'].append("Checking for new games...")
+            new_games = chessy_service.check_for_updates()
+            
+            if new_games > 0:
+                background_tasks['download']['messages'].append(f"Found {new_games} new games")
+                background_tasks['download']['status'] = f"Downloaded {new_games} new games"
+                background_tasks['download']['result'] = new_games
+                
+                # If games were downloaded, parse them immediately to avoid empty JSON errors
+                background_tasks['download']['messages'].append("Parsing downloaded games...")
+                if os.path.exists(ARCHIVE_FILE):
+                    try:
+                        games_data = chessy_service.parser.parse_games(ARCHIVE_FILE)
+                        if games_data:
+                            background_tasks['download']['messages'].append(f"Successfully parsed {len(games_data)} games")
+                    except Exception as e:
+                        background_tasks['download']['messages'].append(f"Error parsing games: {str(e)}")
+            else:
+                background_tasks['download']['messages'].append("No new games found")
+                background_tasks['download']['status'] = "No new games found"
+                background_tasks['download']['result'] = 0
+                
+            background_tasks['download']['timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            end_time = datetime.datetime.now()
+            background_tasks['download']['elapsed_seconds'] = (end_time - background_tasks['download']['start_time']).total_seconds()
+            
+            # New: Push notification to user
+            background_tasks['download']['notification'] = {
+                'type': 'success',
+                'title': 'Download Complete',
+                'message': f"Successfully downloaded {new_games} new games"
+            }
+                
+        except Exception as e:
+            error_msg = f"Download error: {str(e)}"
+            emoji_log(logger, logging.ERROR, error_msg, "❌")
+            background_tasks['download']['status'] = f"Error: {str(e)}"
+            background_tasks['download']['messages'].append(error_msg)
+            
+            # New: Push error notification
+            background_tasks['download']['notification'] = {
+                'type': 'error',
+                'title': 'Download Error',
+                'message': str(e)
+            }
+            
+            # Log detailed traceback
+            traceback_text = traceback.format_exc()
+            logger.error(f"Detailed error:\n{traceback_text}")
+            
+        finally:
+            background_tasks['download']['running'] = False
+            # New: Save task history
+            save_task_history('download', background_tasks['download'])
+
+def analyze_thread(app_context):
+    """Background thread for analyzing games."""
+    with app_context:
+        try:
+            background_tasks['analyze']['running'] = True
+            background_tasks['analyze']['status'] = "Running"
+            background_tasks['analyze']['messages'] = ["Starting analysis..."]
+            background_tasks['analyze']['start_time'] = datetime.datetime.now()
+            
+            # Get the total number of games for progress tracking
+            total_games = 0
+            if os.path.exists(PARSED_GAMES_FILE):
+                try:
+                    with open(PARSED_GAMES_FILE, "r") as f:
+                        parsed_games = json.load(f)
+                        total_games = len(parsed_games)
+                except Exception as e:
+                    emoji_log(logger, logging.ERROR, f"Error loading parsed games: {str(e)}", "❌")
+            
+            background_tasks['analyze']['total'] = total_games
+            background_tasks['analyze']['current'] = 0
+            background_tasks['analyze']['percentage'] = 0
+            background_tasks['analyze']['messages'].append(f"Processing {total_games} games...")
+            
+            # Set up a callback function to update progress
+            def progress_callback(current, total):
+                background_tasks['analyze']['current'] = current
+                background_tasks['analyze']['percentage'] = (current / total * 100) if total > 0 else 0
+                
+                # New: Add incremental milestone messages
+                milestone_percentage = 25
+                current_percentage = int(background_tasks['analyze']['percentage'])
+                
+                if current_percentage > 0 and current_percentage % milestone_percentage == 0:
+                    # Check if we've already recorded this milestone
+                    milestone_message = f"Completed {current_percentage}% ({current}/{total} games)"
+                    if not any(milestone_message in msg for msg in background_tasks['analyze']['messages']):
+                        background_tasks['analyze']['messages'].append(milestone_message)
+                        
+                        # New: Update estimated time remaining (if we have enough data)
+                        if current > 10:  # Wait until we have processed enough games for a good estimate
+                            elapsed = (datetime.datetime.now() - background_tasks['analyze']['start_time']).total_seconds()
+                            games_per_second = current / elapsed if elapsed > 0 else 0
+                            if games_per_second > 0:
+                                remaining_games = total - current
+                                est_remaining_seconds = remaining_games / games_per_second
+                                
+                                # Format time remaining
+                                if est_remaining_seconds > 60:
+                                    est_minutes = int(est_remaining_seconds // 60)
+                                    est_seconds = int(est_remaining_seconds % 60)
+                                    background_tasks['analyze']['messages'].append(
+                                        f"Estimated time remaining: {est_minutes}m {est_seconds}s"
+                                    )
+            
+            # Add progress callback to analyzer
+            if hasattr(chessy_service.analyzer, 'set_progress_callback'):
+                chessy_service.analyzer.set_progress_callback(progress_callback)
+            
+            # Trigger game analysis
+            results = chessy_service.process_new_games()
+            
+            background_tasks['analyze']['messages'].append(f"Completed: {results['analyzed_games']} games analyzed")
+            background_tasks['analyze']['status'] = f"Completed: {results['analyzed_games']} games analyzed"
+            background_tasks['analyze']['result'] = results
+            background_tasks['analyze']['timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            end_time = datetime.datetime.now()
+            background_tasks['analyze']['elapsed_seconds'] = (end_time - background_tasks['analyze']['start_time']).total_seconds()
+            background_tasks['analyze']['current'] = total_games  # Ensure we show 100% at the end
+            background_tasks['analyze']['percentage'] = 100
+            
+            # New: Push notification to user
+            background_tasks['analyze']['notification'] = {
+                'type': 'success',
+                'title': 'Analysis Complete',
+                'message': f"Successfully analyzed {results['analyzed_games']} games"
+            }
+                
+        except Exception as e:
+            error_msg = f"Analysis error: {str(e)}"
+            emoji_log(logger, logging.ERROR, error_msg, "❌")
+            background_tasks['analyze']['status'] = f"Error: {str(e)}"
+            background_tasks['analyze']['messages'].append(error_msg)
+            
+            # New: Push error notification
+            background_tasks['analyze']['notification'] = {
+                'type': 'error',
+                'title': 'Analysis Error',
+                'message': str(e)
+            }
+            
+            # Log detailed traceback
+            traceback_text = traceback.format_exc()
+            logger.error(f"Detailed error:\n{traceback_text}")
+            
+        finally:
+            background_tasks['analyze']['running'] = False
+            # New: Save task history
+            save_task_history('analyze', background_tasks['analyze'])
+
+# New: Task history management
+def save_task_history(task_type, task_data):
+    """Save task history to a file for resumption and tracking."""
+    try:
+        history_file = os.path.join(OUTPUT_DIR, f"{task_type}_history.json")
+        
+        # Load existing history if available
+        history = []
+        if os.path.exists(history_file):
+            try:
+                with open(history_file, "r") as f:
+                    history = json.load(f)
+            except Exception as e:
+                logger.error(f"Error reading task history: {str(e)}")
+        
+        # Create history entry (excluding large data fields)
+        history_entry = {
+            'timestamp': task_data.get('timestamp', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            'status': task_data.get('status', 'Unknown'),
+            'elapsed_seconds': task_data.get('elapsed_seconds', 0),
+            'result': task_data.get('result', None),
+            'success': task_data.get('status', '').startswith('Completed')
+        }
+        
+        # Add to history (limit to last 10 entries)
+        history.append(history_entry)
+        if len(history) > 10:
+            history = history[-10:]
+        
+        # Save updated history
+        with open(history_file, "w") as f:
+            json.dump(history, f, indent=2)
+            
+    except Exception as e:
+        logger.error(f"Error saving task history: {str(e)}")
+
+# New: Notification system for background tasks
+def get_pending_notifications():
+    """Check for notifications from background tasks."""
+    notifications = []
+    
+    for task_type in ['download', 'analyze']:
+        task_data = background_tasks[task_type]
+        if 'notification' in task_data and task_data['notification']:
+            notifications.append(task_data['notification'])
+            # Clear notification after retrieving it
+            task_data['notification'] = None
+    
+    return notifications
+@app.route("/api/export_games", methods=["POST"])
+def export_games():
+    """Export filtered game data."""
+    try:
+        # Get filter parameters from request
+        filters = request.json.get("filters", {})
+        format_type = request.json.get("format", "csv")
+        
+        # Load game data
+        if not os.path.exists(PARSED_GAMES_FILE):
+            return jsonify({"error": "No game data available"}), 400
+            
+        with open(PARSED_GAMES_FILE, "r") as f:
+            games_data = json.load(f)
+        
+        # Apply filters
+        filtered_data = games_data
+        
+        if filters.get("result"):
+            filtered_data = [g for g in filtered_data if g.get("Result") in filters["result"]]
+            
+        if filters.get("time_control"):
+            filtered_data = [g for g in filtered_data if g.get("TimeControl") in filters["time_control"]]
+            
+        if filters.get("played_as"):
+            filtered_data = [g for g in filtered_data if g.get("PlayedAs") == filters["played_as"]]
+            
+        if filters.get("min_moves") is not None:
+            filtered_data = [g for g in filtered_data if g.get("NumMoves", 0) >= filters["min_moves"]]
+            
+        if filters.get("max_moves") is not None:
+            filtered_data = [g for g in filtered_data if g.get("NumMoves", 0) <= filters["max_moves"]]
+
+        if not filtered_data:
+            return jsonify({"warning": "No games match the selected filters"}), 200
+        
+        # Generate filename
+        filename = f"{USERNAME}_games_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        # Create output directory if it doesn't exist
+        export_dir = os.path.join(OUTPUT_DIR, "exports")
+        os.makedirs(export_dir, exist_ok=True)
+        
+        # Format data based on requested format
+        if format_type == "csv":
+            export_path = os.path.join(export_dir, f"{filename}.csv")
+            
+            # Create CSV with pandas for proper handling of all data types
+            df = pd.DataFrame(filtered_data)
+            df.to_csv(export_path, index=False)
+            
+            return jsonify({
+                "status": "success",
+                "message": f"Exported {len(filtered_data)} games as CSV",
+                "filename": f"{filename}.csv",
+                "download_url": f"/download/export/{filename}.csv"
+            })
+            
+        elif format_type == "excel":
+            export_path = os.path.join(export_dir, f"{filename}.xlsx")
+            
+            # Create Excel file with pandas
+            df = pd.DataFrame(filtered_data)
+            
+            # Use openpyxl engine for better formatting
+            with pd.ExcelWriter(export_path, engine='openpyxl') as writer:
+                df.to_excel(writer, sheet_name="Games", index=False)
+                
+                # Auto-fit column widths
+                workbook = writer.book
+                worksheet = writer.sheets["Games"]
+                for i, col in enumerate(df.columns):
+                    max_width = max(df[col].astype(str).apply(len).max(), len(col)) + 2
+                    worksheet.column_dimensions[chr(65 + i)].width = min(max_width, 30)  # Cap at 30 for readability
+            
+            return jsonify({
+                "status": "success",
+                "message": f"Exported {len(filtered_data)} games as Excel",
+                "filename": f"{filename}.xlsx",
+                "download_url": f"/download/export/{filename}.xlsx"
+            })
+            
+        elif format_type == "text":
+            export_path = os.path.join(export_dir, f"{filename}.txt")
+            
+            # Create a nicely formatted text file
+            with open(export_path, "w") as f:
+                f.write(f"Chess.com Game Export for {USERNAME}\n")
+                f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"Total Games: {len(filtered_data)}\n")
+                f.write("=" * 80 + "\n\n")
+                
+                for i, game in enumerate(filtered_data, 1):
+                    f.write(f"Game #{i}\n")
+                    f.write(f"Date: {game.get('date', 'Unknown')}\n")
+                    f.write(f"White: {game.get('white', 'Unknown')}\n")
+                    f.write(f"Black: {game.get('black', 'Unknown')}\n")
+                    f.write(f"Result: {game.get('Result', 'Unknown')}\n")
+                    f.write(f"Opening: {game.get('opening', 'Unknown')} (ECO: {game.get('ECO', 'Unknown')})\n")
+                    f.write(f"Time Control: {game.get('TimeControl', 'Unknown')}\n")
+                    f.write(f"Moves: {game.get('NumMoves', 'Unknown')}\n")
+                    
+                    # Add analysis data if available
+                    if 'blunders' in game or 'inaccuracies' in game:
+                        f.write(f"Analysis:\n")
+                        f.write(f"  Blunders: {game.get('blunders', 0)}\n")
+                        f.write(f"  Inaccuracies: {game.get('inaccuracies', 0)}\n")
+                    
+                    f.write("\n" + "-" * 40 + "\n\n")
+            
+            return jsonify({
+                "status": "success",
+                "message": f"Exported {len(filtered_data)} games as text",
+                "filename": f"{filename}.txt",
+                "download_url": f"/download/export/{filename}.txt"
+            })
+            
+        else:
+            return jsonify({"error": "Unsupported export format"}), 400
+            
+    except Exception as e:
+        emoji_log(logger, logging.ERROR, f"Error exporting games: {str(e)}", "❌")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/download/export/<filename>")
+def download_export_file(filename):
+    """Serve an exported file for download."""
+    try:
+        export_dir = os.path.join(OUTPUT_DIR, "exports")
+        return send_from_directory(
+            export_dir, 
+            filename, 
+            as_attachment=True,
+            attachment_filename=filename
+        )
+    except Exception as e:
+        emoji_log(logger, logging.ERROR, f"Error serving export file: {str(e)}", "❌")
+        flash("Error downloading file.", "error")
+        return redirect(url_for("games"))
+    
+
+
+@app.route("/api/config")
+def get_config():
+    """Return a subset of configuration info."""
+    # Only return non-sensitive configuration
+    config_data = {
+        "version": "0.2.0",
+        "username": USERNAME,
+        "stockfish_available": bool(STOCKFISH_PATH and os.path.exists(STOCKFISH_PATH)),
+        "output_dir": OUTPUT_DIR,
+        "has_data": os.path.exists(ARCHIVE_FILE) and os.path.getsize(ARCHIVE_FILE) > 0,
+        "games_count": 0,
+        "last_download": None,
+        "last_analysis": None
+    }
+    
+    # Add game count if available
+    if os.path.exists(PARSED_GAMES_FILE):
+        try:
+            with open(PARSED_GAMES_FILE, "r") as f:
+                games_data = json.load(f)
+                config_data["games_count"] = len(games_data)
+        except Exception:
+            pass
+    
+    # Add last download time if available
+    if os.path.exists(LAST_DOWNLOADED_FILE):
+        try:
+            with open(LAST_DOWNLOADED_FILE, "r") as f:
+                config_data["last_download"] = f.read().strip()
+        except Exception:
+            pass
+    
+    # Add last analysis time
+    if os.path.exists(GAME_ANALYSIS_FILE):
+        try:
+            config_data["last_analysis"] = datetime.fromtimestamp(
+                os.path.getmtime(GAME_ANALYSIS_FILE)
+            ).strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
+    
+    return jsonify(config_data)
+
+@app.route("/api/logs")
+@admin_required
+def get_logs():
+    """Return recent log entries for troubleshooting."""
+    try:
+        log_files = []
+        
+        # Find all log files
+        if os.path.exists(OUTPUT_DIR):
+            for filename in os.listdir(OUTPUT_DIR):
+                if filename.endswith(".log"):
+                    log_path = os.path.join(OUTPUT_DIR, filename)
+                    log_files.append({
+                        "name": filename,
+                        "path": log_path,
+                        "size": os.path.getsize(log_path),
+                        "modified": datetime.fromtimestamp(os.path.getmtime(log_path)).strftime("%Y-%m-%d %H:%M:%S")
+                    })
+        
+        # Sort by modification time (newest first)
+        log_files.sort(key=lambda x: x["modified"], reverse=True)
+        
+        # Get content of most recent log file
+        recent_logs = []
+        if log_files:
+            most_recent = log_files[0]["path"]
+            with open(most_recent, "r") as f:
+                recent_logs = f.readlines()[-100:]  # Last 100 lines
+        
+        return jsonify({
+            "log_files": log_files,
+            "recent_logs": recent_logs
+        })
+    except Exception as e:
+        emoji_log(logger, logging.ERROR, f"Error retrieving logs: {str(e)}", "❌")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/logs/<filename>")
+@admin_required
+def get_log_file(filename):
+    """Return a specific log file."""
+    try:
+        log_path = os.path.join(OUTPUT_DIR, filename)
+        
+        # Security check to prevent path traversal
+        if not os.path.normpath(log_path).startswith(os.path.normpath(OUTPUT_DIR)):
+            return jsonify({"error": "Invalid log file path"}), 403
+            
+        if not os.path.exists(log_path):
+            return jsonify({"error": "Log file not found"}), 404
+            
+        with open(log_path, "r") as f:
+            content = f.readlines()
+            
+        return jsonify({
+            "filename": filename,
+            "content": content
+        })
+    except Exception as e:
+        emoji_log(logger, logging.ERROR, f"Error retrieving log file: {str(e)}", "❌")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/analytics/mistake_trends")
+def get_mistake_trends():
+    """Get mistake trends over time."""
+    try:
+        if not os.path.exists(GAME_ANALYSIS_FILE):
+            return jsonify({"error": "No analysis data available"}), 404
+            
+        with open(GAME_ANALYSIS_FILE, "r") as f:
+            games_data = json.load(f)
+            
+        if not games_data:
+            return jsonify({"error": "No games found"}), 404
+            
+        # Prepare data structure for trend analysis by month
+        monthly_data = {}
+        
+        for game in games_data:
+            date_str = game.get("date", "")
+            if not date_str or date_str == "????-??-??":
+                continue
+                
+            # Extract year-month from date
+            try:
+                if "-" in date_str:
+                    year_month = date_str[:7]  # Format: YYYY-MM
+                else:
+                    # Try to parse Chess.com date format
+                    date_obj = datetime.strptime(date_str, "%Y.%m.%d")
+                    year_month = date_obj.strftime("%Y-%m")
+            except Exception:
+                continue
+                
+            # Initialize month data if needed
+            if year_month not in monthly_data:
+                monthly_data[year_month] = {
+                    "games": 0,
+                    "blunders": 0,
+                    "inaccuracies": 0,
+                    "white_games": 0,
+                    "black_games": 0,
+                    "wins": 0,
+                    "losses": 0,
+                    "draws": 0
+                }
+                
+            # Update game counts
+            monthly_data[year_month]["games"] += 1
+            monthly_data[year_month]["blunders"] += game.get("blunders", 0)
+            monthly_data[year_month]["inaccuracies"] += game.get("inaccuracies", 0)
+            
+            # Update color counts
+            if game.get("PlayedAs") == "White":
+                monthly_data[year_month]["white_games"] += 1
+            else:
+                monthly_data[year_month]["black_games"] += 1
+                
+            # Update result counts
+            result = game.get("Result", "")
+            played_as = game.get("PlayedAs", "")
+            
+            if result == "1/2-1/2":
+                monthly_data[year_month]["draws"] += 1
+            elif (result == "1-0" and played_as == "White") or (result == "0-1" and played_as == "Black"):
+                monthly_data[year_month]["wins"] += 1
+            else:
+                monthly_data[year_month]["losses"] += 1
+        
+        # Calculate averages and format for chart display
+        trend_data = []
+        for month, data in sorted(monthly_data.items()):
+            if data["games"] > 0:
+                trend_data.append({
+                    "month": month,
+                    "games": data["games"],
+                    "avg_blunders": round(data["blunders"] / data["games"], 2),
+                    "avg_inaccuracies": round(data["inaccuracies"] / data["games"], 2),
+                    "avg_total_mistakes": round((data["blunders"] + data["inaccuracies"]) / data["games"], 2),
+                    "win_rate": round(data["wins"] / data["games"] * 100, 1),
+                    "white_percentage":
+
+################################################################################
+# IV. SETUP WIZARD AND CONFIGURATION HELPERS
+################################################################################
+def create_env_file(username, email, stockfish_path=None):
+    """Create a .env file with user configuration."""
+    try:
+        env_content = [
+            "# Chess.com user settings",
+            f"CHESSCOM_USERNAME={username}",
+            f"CHESSCOM_CONTACT_EMAIL={email}",
+        ]
+        
+        if stockfish_path:
+            env_content.append(f"STOCKFISH_PATH={stockfish_path}")
+        
+        with open(".env", "w") as f:
+            f.write("\n".join(env_content))
+            
+        emoji_log(logger, logging.INFO, f"Created .env file for user: {username}", "✅")
+        return True
+    except Exception as e:
+        emoji_log(logger, logging.ERROR, f"Error creating .env file: {str(e)}", "❌")
+        return False
+
+def detect_stockfish():
+    """Attempt to detect Stockfish installation on the system."""
+    common_paths = [
+        # Windows paths
+        "C:/Program Files/Stockfish/stockfish.exe",
+        "C:/Program Files (x86)/Stockfish/stockfish.exe",
+        # macOS paths
+        "/usr/local/bin/stockfish",
+        "/opt/homebrew/bin/stockfish",
+        # Linux paths
+        "/usr/bin/stockfish",
+        "/usr/local/bin/stockfish"
+    ]
+    
+    # Check common paths
+    for path in common_paths:
+        if os.path.exists(path):
+            return path
+    
+    # Try to find in PATH
+    try:
+        import subprocess
+        which_result = subprocess.run(
+            ["which", "stockfish"] if os.name != "nt" else ["where", "stockfish"],
+            capture_output=True, text=True, check=False
+        )
+        if which_result.returncode == 0:
+            return which_result.stdout.strip()
+    except Exception:
+        pass
+    
+    return None
+
+@app.route("/setup", methods=["GET", "POST"])
+def setup_wizard():
+    """First-time setup wizard."""
+    # Redirect if already configured
+    if validate_config() and USERNAME:
+        flash("Configuration already exists.", "info")
+        return redirect(url_for("index"))
+    
+    if request.method == "POST":
+        username = request.form.get("username")
+        email = request.form.get("email")
+        stockfish_path = request.form.get("stockfish_path")
+        
+        if not username:
+            flash("Chess.com username is required.", "error")
+            return render_template(
+                "setup.html", 
+                detected_stockfish=detect_stockfish()
+            )
+        
+        # Create .env file
+        success = create_env_file(username, email, stockfish_path)
+        
+        if success:
+            flash("Setup completed successfully! Restarting application...", "success")
+            # In a production environment, you might want to restart the app
+            # For development, just redirect to force config reload
+            return redirect(url_for("index"))
+        else:
+            flash("Error creating configuration. Please check permissions.", "error")
+    
+    return render_template(
+        "setup.html", 
+        detected_stockfish=detect_stockfish()
+    )
+
+@app.route("/settings", methods=["GET", "POST"])
+def settings_page():
+    """Settings configuration page."""
+    # Handle settings update
+    if request.method == "POST":
+        username = request.form.get("username", USERNAME)
+        email = request.form.get("email", CONTACT_EMAIL)
+        stockfish_path = request.form.get("stockfish_path", STOCKFISH_PATH)
+        
+        # Create .env file
+        success = create_env_file(username, email, stockfish_path)
+        
+        if success:
+            flash("Settings updated successfully! Changes will take effect after restart.", "success")
+        else:
+            flash("Error saving settings. Please check permissions.", "error")
+            
+        return redirect(url_for("settings_page"))
+    
+    # Display current settings
+    current_settings = {
+        "username": USERNAME,
+        "email": CONTACT_EMAIL,
+        "stockfish_path": STOCKFISH_PATH
+    }
+    
+    return render_template(
+        "settings.html",
+        settings=current_settings,
+        detected_stockfish=detect_stockfish()
+    )
 ################################################################################
 # VI. MAIN ENTRY POINT
 ################################################################################

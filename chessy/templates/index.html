@@ -4,65 +4,12 @@
 
 {% block extra_css %}
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-<style>
-    /* Spinner styles */
-    .spinner-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.5);
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-        color: white;
-        display: none;
-    }
-    .spinner-message {
-        margin-top: 20px;
-        max-width: 80%;
-        text-align: center;
-    }
-    .progress-container {
-        width: 80%;
-        max-width: 500px;
-        margin-top: 20px;
-    }
-    /* Pulse animation for the message */
-    @keyframes pulse {
-        0% { opacity: 0.6; }
-        50% { opacity: 1; }
-        100% { opacity: 0.6; }
-    }
-    .pulse {
-        animation: pulse 2s infinite;
-    }
-</style>
 {% endblock %}
 
 {% block content %}
 <!-- Store data properties here for JavaScript access -->
 <div id="app-data" 
      data-has-data="{{ 'true' if has_data else 'false' }}">
-</div>
-
-<!-- Loading Spinner Overlay -->
-<div id="spinnerOverlay" class="spinner-overlay">
-    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>
-    <div id="spinnerMessage" class="spinner-message pulse">
-        Processing chess games. This may take several minutes for large collections...
-    </div>
-    <div class="progress-container">
-        <div class="progress" style="height: 20px;">
-            <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
-        </div>
-        <div id="progressCounter" class="text-center mt-2">0 / 0 games processed</div>
-    </div>
 </div>
 
 <!-- Dashboard Header -->
@@ -81,12 +28,18 @@
                 <h5 class="card-title mb-0">Actions</h5>
             </div>
             <div class="card-body">
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 flex-wrap">
                     <button id="downloadBtn" class="btn btn-primary">
                         <i class="bi bi-download"></i> Download New Games
                     </button>
-                    <button id="analyzeBtn" class="btn btn-success">
+                    <button id="analyzeBtn" class="btn btn-success" {% if not has_data %}disabled{% endif %}>
                         <i class="bi bi-graph-up"></i> Analyze Games
+                    </button>
+                    <button id="advancedAnalysisBtn" class="btn btn-info" disabled>
+                        <i class="bi bi-stars"></i> Advanced Analysis
+                    </button>
+                    <button id="aiInsightsBtn" class="btn btn-secondary" disabled>
+                        <i class="bi bi-magic"></i> AI Insights
                     </button>
                 </div>
             </div>
@@ -201,39 +154,13 @@
 
 {% block extra_js %}
 <script>
-    // Loading spinner functionality
-    function showSpinner(message) {
-        const spinner = document.getElementById('spinnerOverlay');
-        const spinnerMessage = document.getElementById('spinnerMessage');
-        spinnerMessage.textContent = message || 'Processing...';
-        spinner.style.display = 'flex';
-    }
+    // Remove the original blocking spinner functionality
     
-    function hideSpinner() {
-        const spinner = document.getElementById('spinnerOverlay');
-        spinner.style.display = 'none';
-    }
-
-    function updateProgressBar(current, total, percentage) {
-        const progressBar = document.getElementById('progressBar');
-        const progressCounter = document.getElementById('progressCounter');
-        
-        // Update progress bar
-        progressBar.style.width = `${percentage}%`;
-        progressBar.setAttribute('aria-valuenow', percentage);
-        progressBar.textContent = `${Math.round(percentage)}%`;
-        
-        // Update counter
-        progressCounter.textContent = `${current} / ${total} games processed`;
-    }
-
-    // Get app data from DOM
-    const appData = document.getElementById('app-data');
-    const hasData = appData.getAttribute('data-has-data') === 'true';
-
-    // Form submission with AJAX to monitor progress
+    // Form submission with AJAX for background tasks
     document.getElementById('downloadBtn').addEventListener('click', function() {
-        showSpinner('Downloading games from Chess.com. This may take a minute...');
+        // Disable button to prevent multiple clicks
+        this.disabled = true;
+        this.innerHTML = '<i class="bi bi-hourglass-split"></i> Starting Download...';
         
         // Use fetch to submit form
         fetch('/download', {
@@ -252,22 +179,34 @@
         })
         .then(data => {
             if (data.status === 'success') {
-                startProgressMonitoring();
+                // Re-enable button with success indicator
+                document.getElementById('downloadBtn').innerHTML = '<i class="bi bi-download"></i> Download New Games';
+                document.getElementById('downloadBtn').disabled = false;
+                
+                // Enable analyze button if download was successful
+                setTimeout(() => {
+                    document.getElementById('analyzeBtn').disabled = false;
+                }, 1000);
             } else {
-                hideSpinner();
+                // Re-enable button with error indicator
+                document.getElementById('downloadBtn').innerHTML = '<i class="bi bi-download"></i> Download New Games';
+                document.getElementById('downloadBtn').disabled = false;
                 alert('Error: ' + data.message);
             }
         })
         .catch(error => {
             if (error === 'Redirected') return;
             console.error('Error:', error);
-            hideSpinner();
+            document.getElementById('downloadBtn').innerHTML = '<i class="bi bi-download"></i> Download New Games';
+            document.getElementById('downloadBtn').disabled = false;
             alert('An error occurred while downloading games.');
         });
     });
     
     document.getElementById('analyzeBtn').addEventListener('click', function() {
-        showSpinner('Analyzing your chess games. This may take several minutes for large collections...');
+        // Disable button to prevent multiple clicks
+        this.disabled = true;
+        this.innerHTML = '<i class="bi bi-hourglass-split"></i> Starting Analysis...';
         
         fetch('/analyze', {
             method: 'POST',
@@ -285,81 +224,34 @@
         })
         .then(data => {
             if (data.status === 'success') {
-                startProgressMonitoring();
+                // Re-enable button after short delay
+                setTimeout(() => {
+                    document.getElementById('analyzeBtn').innerHTML = '<i class="bi bi-graph-up"></i> Analyze Games';
+                    document.getElementById('analyzeBtn').disabled = false;
+                    
+                    // Enable next level button
+                    document.getElementById('advancedAnalysisBtn').disabled = false;
+                }, 1000);
             } else {
-                hideSpinner();
+                // Re-enable button with error indicator
+                document.getElementById('analyzeBtn').innerHTML = '<i class="bi bi-graph-up"></i> Analyze Games';
+                document.getElementById('analyzeBtn').disabled = false;
                 alert('Error: ' + data.message);
             }
         })
         .catch(error => {
             if (error === 'Redirected') return;
             console.error('Error:', error);
-            hideSpinner();
+            document.getElementById('analyzeBtn').innerHTML = '<i class="bi bi-graph-up"></i> Analyze Games';
+            document.getElementById('analyzeBtn').disabled = false;
             alert('An error occurred while analyzing games.');
         });
     });
-    
-    // Progress monitoring
-    let progressInterval;
-    
-    function startProgressMonitoring() {
-        // Show progress elements
-        document.querySelector('.progress-container').style.display = 'block';
-        
-        // Check progress every 2 seconds
-        progressInterval = setInterval(checkProgress, 2000);
-    }
-    
-    function stopProgressMonitoring() {
-        clearInterval(progressInterval);
-        hideSpinner();
-    }
-    
-    function checkProgress() {
-        fetch('/api/progress')
-            .then(response => response.json())
-            .then(data => {
-                if (data.active) {
-                    // Update spinner message with the latest progress
-                    if (data.messages && data.messages.length > 0) {
-                        const latestMessage = data.messages[data.messages.length - 1];
-                        document.getElementById('spinnerMessage').textContent = latestMessage;
-                    }
-                    
-                    // Update progress bar if we have total/current counts
-                    if (data.total > 0) {
-                        updateProgressBar(data.current, data.total, data.percentage);
-                    }
-                    
-                    // Format elapsed time
-                    let elapsedText = '';
-                    if (data.elapsed_seconds > 60) {
-                        const minutes = Math.floor(data.elapsed_seconds / 60);
-                        const seconds = data.elapsed_seconds % 60;
-                        elapsedText = ` (${minutes}m ${seconds}s)`;
-                    } else {
-                        elapsedText = ` (${data.elapsed_seconds}s)`;
-                    }
-                    
-                    // Append elapsed time to the message
-                    const messageEl = document.getElementById('spinnerMessage');
-                    if (!messageEl.textContent.includes('(')) {
-                        messageEl.textContent += elapsedText;
-                    } else {
-                        messageEl.textContent = messageEl.textContent.replace(/\(\d+[ms]+ \d+[ms]+\)|\(\d+[ms]+\)/, elapsedText);
-                    }
-                } else {
-                    // Operation completed, refresh the page to show updated data
-                    stopProgressMonitoring();
-                    window.location.reload();
-                }
-            })
-            .catch(error => {
-                console.error('Error checking progress:', error);
-            });
-    }
 
     // Load chart data if has_data is true
+    const appData = document.getElementById('app-data');
+    const hasData = appData.getAttribute('data-has-data') === 'true';
+
     if (hasData) {
         fetch("/api/charts/win_rate")
         .then(response => response.json())
