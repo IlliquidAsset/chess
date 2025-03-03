@@ -30,14 +30,16 @@
                     <li class="nav-item">
                         <a class="nav-link {% if request.path == '/openings' %}active{% endif %}" href="/openings">Openings</a>
                     </li>
-                    {% if request.path == '/blunders' or request.path == '/inaccuracies' %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/blunders' %}active{% endif %}" href="/blunders">Blunders</a>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Analysis
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item {% if request.path == '/mistakes' %}active{% endif %}" href="/mistakes">Mistakes Overview</a></li>
+                            <li><a class="dropdown-item {% if request.path == '/blunders' %}active{% endif %}" href="/blunders">Blunders</a></li>
+                            <li><a class="dropdown-item {% if request.path == '/inaccuracies' %}active{% endif %}" href="/inaccuracies">Inaccuracies</a></li>
+                        </ul>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/inaccuracies' %}active{% endif %}" href="/inaccuracies">Inaccuracies</a>
-                    </li>
-                    {% endif %}
                 </ul>
                 <div class="ms-auto">
                     <button id="themeToggle" class="btn btn-outline-light btn-sm">
@@ -67,7 +69,7 @@
     </div>
 
     <!-- Footer -->
-    <footer class="footer bg-dark text-light py-4 mt-5">
+    <footer class="footer bg-dark text-light py-4 mt-auto">
         <div class="container">
             <div class="row">
                 <div class="col-md-4">
@@ -77,18 +79,18 @@
                 </div>
                 <div class="col-md-4 text-md-center">
                     <h5>Connect</h5>
-                    <div class="social-links">
-                        <a href="https://www.kendrickcreates.com" target="_blank" class="text-light me-3">
-                            <i class="bi bi-globe"></i>
+                    <div class="social-links mt-2">
+                        <a href="https://www.kendrickcreates.com" target="_blank" class="text-light me-3" title="Website">
+                            <i class="bi bi-globe fs-4"></i>
                         </a>
-                        <a href="https://linkedin.com/in/KKirk" target="_blank" class="text-light me-3">
-                            <i class="bi bi-linkedin"></i>
+                        <a href="https://linkedin.com/in/KKirk" target="_blank" class="text-light me-3" title="LinkedIn">
+                            <i class="bi bi-linkedin fs-4"></i>
                         </a>
-                        <a href="https://instagram.com/KendrickCreates" target="_blank" class="text-light me-3">
-                            <i class="bi bi-instagram"></i>
+                        <a href="https://instagram.com/KendrickCreates" target="_blank" class="text-light me-3" title="Instagram">
+                            <i class="bi bi-instagram fs-4"></i>
                         </a>
-                        <a href="https://about.me/KendrickKirk" target="_blank" class="text-light">
-                            <i class="bi bi-person-circle"></i>
+                        <a href="https://about.me/KendrickKirk" target="_blank" class="text-light" title="About Me">
+                            <i class="bi bi-person-circle fs-4"></i>
                         </a>
                     </div>
                 </div>

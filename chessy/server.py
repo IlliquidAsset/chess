@@ -43,7 +43,10 @@ background_tasks = {
         'timestamp': None,
         'messages': [],
         'start_time': None,
-        'elapsed_seconds': 0
+        'elapsed_seconds': 0,
+        'total': 0,
+        'current': 0,
+        'percentage': 0
     },
     'analyze': {
         'running': False,
@@ -52,7 +55,10 @@ background_tasks = {
         'timestamp': None,
         'messages': [],
         'start_time': None,
-        'elapsed_seconds': 0
+        'elapsed_seconds': 0,
+        'total': 0,
+        'current': 0,
+        'percentage': 0
     }
 }
 
@@ -119,10 +125,30 @@ def ensure_required_files():
     # Check for parsed game data
     if not os.path.exists(PARSED_GAMES_FILE):
         emoji_log(logger, logging.WARNING, "No parsed games file found. Will process on first request.", "⚠️")
+        # Try to parse games from archive file if it exists
+        if os.path.exists(ARCHIVE_FILE) and chessy_service:
+            try:
+                # Create an empty parsed games file
+                with open(PARSED_GAMES_FILE, "w") as f:
+                    f.write(json.dumps([]))
+                    
+                # Parse games
+                emoji_log(logger, logging.INFO, f"Parsing games from existing archive: {ARCHIVE_FILE}", "📊")
+                games_data = chessy_service.parser.parse_games(ARCHIVE_FILE)
+                if games_data:
+                    emoji_log(logger, logging.INFO, f"Successfully parsed {len(games_data)} games", "✅")
+            except Exception as e:
+                emoji_log(logger, logging.ERROR, f"Error parsing games: {str(e)}", "❌")
         
     # Check for game analysis
     if not os.path.exists(GAME_ANALYSIS_FILE):
         emoji_log(logger, logging.WARNING, "No game analysis found. Will run analysis on request.", "⚠️")
+        # Create an empty analysis file so JSON reads don't fail
+        try:
+            with open(GAME_ANALYSIS_FILE, "w") as f:
+                f.write(json.dumps([]))
+        except Exception as e:
+            emoji_log(logger, logging.ERROR, f"Error creating empty analysis file: {str(e)}", "❌")
         
     return True
 
@@ -166,6 +192,9 @@ def download_thread(app_context):
             background_tasks['download']['status'] = "Running"
             background_tasks['download']['messages'] = ["Starting download..."]
             background_tasks['download']['start_time'] = datetime.datetime.now()
+            background_tasks['download']['total'] = 0
+            background_tasks['download']['current'] = 0
+            background_tasks['download']['percentage'] = 0
             
             # Trigger game download
             background_tasks['download']['messages'].append("Checking for new games...")
@@ -175,6 +204,16 @@ def download_thread(app_context):
                 background_tasks['download']['messages'].append(f"Found {new_games} new games")
                 background_tasks['download']['status'] = f"Downloaded {new_games} new games"
                 background_tasks['download']['result'] = new_games
+                
+                # If games were downloaded, parse them immediately to avoid empty JSON errors
+                background_tasks['download']['messages'].append("Parsing downloaded games...")
+                if os.path.exists(ARCHIVE_FILE):
+                    try:
+                        games_data = chessy_service.parser.parse_games(ARCHIVE_FILE)
+                        if games_data:
+                            background_tasks['download']['messages'].append(f"Successfully parsed {len(games_data)} games")
+                    except Exception as e:
+                        background_tasks['download']['messages'].append(f"Error parsing games: {str(e)}")
             else:
                 background_tasks['download']['messages'].append("No new games found")
                 background_tasks['download']['status'] = "No new games found"
@@ -206,8 +245,31 @@ def analyze_thread(app_context):
             background_tasks['analyze']['messages'] = ["Starting analysis..."]
             background_tasks['analyze']['start_time'] = datetime.datetime.now()
             
+            # Get the total number of games for progress tracking
+            total_games = 0
+            if os.path.exists(PARSED_GAMES_FILE):
+                try:
+                    with open(PARSED_GAMES_FILE, "r") as f:
+                        parsed_games = json.load(f)
+                        total_games = len(parsed_games)
+                except Exception as e:
+                    emoji_log(logger, logging.ERROR, f"Error loading parsed games: {str(e)}", "❌")
+            
+            background_tasks['analyze']['total'] = total_games
+            background_tasks['analyze']['current'] = 0
+            background_tasks['analyze']['percentage'] = 0
+            background_tasks['analyze']['messages'].append(f"Processing {total_games} games...")
+            
+            # Set up a callback function to update progress
+            def progress_callback(current, total):
+                background_tasks['analyze']['current'] = current
+                background_tasks['analyze']['percentage'] = (current / total * 100) if total > 0 else 0
+            
+            # Add progress callback to analyzer
+            if hasattr(chessy_service.analyzer, 'set_progress_callback'):
+                chessy_service.analyzer.set_progress_callback(progress_callback)
+            
             # Trigger game analysis
-            background_tasks['analyze']['messages'].append("Processing games...")
             results = chessy_service.process_new_games()
             
             background_tasks['analyze']['messages'].append(f"Completed: {results['analyzed_games']} games analyzed")
@@ -216,6 +278,8 @@ def analyze_thread(app_context):
             background_tasks['analyze']['timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             end_time = datetime.datetime.now()
             background_tasks['analyze']['elapsed_seconds'] = (end_time - background_tasks['analyze']['start_time']).total_seconds()
+            background_tasks['analyze']['current'] = total_games  # Ensure we show 100% at the end
+            background_tasks['analyze']['percentage'] = 100
                 
         except Exception as e:
             error_msg = f"Analysis error: {str(e)}"
@@ -485,7 +549,7 @@ def inaccuracies():
         emoji_log(logger, logging.ERROR, f"Error loading inaccuracies data: {str(e)}", "❌")
     
     return render_template(
-        "inaccuracy.html",
+        "inaccuracies.html",
         username=USERNAME,
         total_inaccuracies=total_inaccuracies,
         avg_inaccuracies=avg_inaccuracies,
@@ -531,12 +595,16 @@ def get_progress():
         active_task = 'analyze'
     
     if active_task:
+        task_data = background_tasks[active_task]
         return jsonify({
             "active": True,
             "task": active_task,
-            "status": background_tasks[active_task]['status'],
-            "messages": background_tasks[active_task]['messages'],
-            "elapsed_seconds": background_tasks[active_task]['elapsed_seconds']
+            "status": task_data['status'],
+            "messages": task_data['messages'],
+            "elapsed_seconds": task_data['elapsed_seconds'],
+            "total": task_data['total'],
+            "current": task_data['current'],
+            "percentage": task_data['percentage']
         })
     else:
         return jsonify({
@@ -635,105 +703,41 @@ def win_rate_chart():
                 return tc if tc else "Unknown"
         
         # Prepare time control groups
-        df['TimeControlGroup'] = df['TimeControl'].apply(parse_time_control)
-        
-        # Calculate win rates by time control
-        tc_stats = {}
-        for group, group_df in df.groupby('TimeControlGroup'):
-            if group == "Unknown" and len(group_df) < 5:  # Skip Unknown if it's just a few games
-                continue
+        if 'TimeControl' in df.columns:
+            df['TimeControlGroup'] = df['TimeControl'].apply(parse_time_control)
+            
+            # Calculate win rates by time control
+            tc_stats = {}
+            for group, group_df in df.groupby('TimeControlGroup'):
+                if group == "Unknown" and len(group_df) < 5:  # Skip Unknown if it's just a few games
+                    continue
+                    
+                tc_stats[group] = {
+                    'games': len(group_df),
+                    'wins': sum((group_df['PlayedAs'] == 'White') & (group_df['Result'] == '1-0') | 
+                                (group_df['PlayedAs'] == 'Black') & (group_df['Result'] == '0-1')),
+                    'losses': sum((group_df['PlayedAs'] == 'White') & (group_df['Result'] == '0-1') | 
+                                (group_df['PlayedAs'] == 'Black') & (group_df['Result'] == '1-0')),
+                    'draws': sum(group_df['Result'] == '1/2-1/2')
+                }
+            
+            # Create chart data
+            chart_data = []
+            for tc, stats in tc_stats.items():
+                win_rate = stats['wins'] / stats['games'] * 100 if stats['games'] > 0 else 0
+                chart_data.append({
+                    'timeControl': tc,
+                    'winRate': round(win_rate, 1),
+                    'games': stats['games']
+                })
                 
-            tc_stats[group] = {
-                'games': len(group_df),
-                'wins': sum((group_df['PlayedAs'] == 'White') & (group_df['Result'] == '1-0') | 
-                          (group_df['PlayedAs'] == 'Black') & (group_df['Result'] == '0-1')),
-                'losses': sum((group_df['PlayedAs'] == 'White') & (group_df['Result'] == '0-1') | 
-                            (group_df['PlayedAs'] == 'Black') & (group_df['Result'] == '1-0')),
-                'draws': sum(group_df['Result'] == '1/2-1/2')
-            }
-        
-        # Create chart data
-        chart_data = []
-        for tc, stats in tc_stats.items():
-            win_rate = stats['wins'] / stats['games'] * 100 if stats['games'] > 0 else 0
-            chart_data.append({
-                'timeControl': tc,
-                'winRate': round(win_rate, 1),
-                'games': stats['games']
-            })
-            
-        # Sort by number of games (descending)
-        chart_data = sorted(chart_data, key=lambda x: x['games'], reverse=True)
-            
-        return jsonify(chart_data)
-        
-    except Exception as e:
-        emoji_log(logger, logging.ERROR, f"Error generating win rate chart: {str(e)}", "❌")
-        return jsonify([])
-    """Generate win rate chart data."""
-    try:
-        if not os.path.exists(GAME_ANALYSIS_FILE):
+            # Sort by number of games (descending)
+            chart_data = sorted(chart_data, key=lambda x: x['games'], reverse=True)
+                
+            return jsonify(chart_data)
+        else:
             return jsonify([])
             
-        with open(GAME_ANALYSIS_FILE, "r") as f:
-            data = json.load(f)
-            
-        if not data:
-            return jsonify([])
-            
-        df = pd.DataFrame(data)
-        
-        # Handle different time control formats
-        def parse_time_control(tc):
-            try:
-                if not tc or tc == "Unknown":
-                    return "Unknown"
-                
-                # Handle time+increment format (e.g. "300+2")
-                if "+" in tc:
-                    base_time = int(tc.split("+")[0])
-                # Handle seconds only format
-                else:
-                    base_time = int(tc)
-                
-                if base_time < 180:
-                    return "Bullet"
-                elif base_time < 600:
-                    return "Blitz"
-                elif base_time < 1800:
-                    return "Rapid"
-                else:
-                    return "Classical"
-            except:
-                return "Unknown"
-        
-        # Prepare time control groups
-        df['TimeControlGroup'] = df['TimeControl'].apply(parse_time_control)
-        
-        # Calculate win rates by time control
-        tc_stats = {}
-        for group, group_df in df.groupby('TimeControlGroup'):
-            tc_stats[group] = {
-                'games': len(group_df),
-                'wins': sum((group_df['PlayedAs'] == 'White') & (group_df['Result'] == '1-0') | 
-                          (group_df['PlayedAs'] == 'Black') & (group_df['Result'] == '0-1')),
-                'losses': sum((group_df['PlayedAs'] == 'White') & (group_df['Result'] == '0-1') | 
-                            (group_df['PlayedAs'] == 'Black') & (group_df['Result'] == '1-0')),
-                'draws': sum(group_df['Result'] == '1/2-1/2')
-            }
-        
-        # Create chart data
-        chart_data = []
-        for tc, stats in tc_stats.items():
-            win_rate = stats['wins'] / stats['games'] * 100 if stats['games'] > 0 else 0
-            chart_data.append({
-                'timeControl': tc,
-                'winRate': round(win_rate, 1),
-                'games': stats['games']
-            })
-            
-        return jsonify(chart_data)
-        
     except Exception as e:
         emoji_log(logger, logging.ERROR, f"Error generating win rate chart: {str(e)}", "❌")
         return jsonify([])
@@ -1026,6 +1030,36 @@ def server_error(e):
     logger.error(f"Server error: {str(e)}")
     return render_template("errors/server_error.html", username=USERNAME), 500
 
+@app.route("/api/eco/all")
+def get_all_eco_codes():
+    """Return all ECO codes and descriptions as JSON, using python-chess."""
+    try:
+        import chess.pgn
+        
+        # python-chess includes a comprehensive ECO database
+        eco_data = {}
+        
+        # Iterate through the ECO database
+        for eco in chess.pgn.ECO_CODES:
+            eco_data[eco] = chess.pgn.ECO_NAMES[eco]
+            
+        return jsonify(eco_data)
+    except ImportError:
+        # Fallback to basic descriptions if python-chess is not available
+        eco_data = {
+            "A00": "Irregular Openings",
+            "B20": "Sicilian Defence",
+            "C00": "French Defense",
+            "D00": "Queen's Pawn Game",
+            "E00": "Queen's Pawn, Indian Defenses"
+        }
+        emoji_log(logger, logging.WARNING, 
+                 "python-chess not available. Using fallback ECO data.", "⚠️")
+        return jsonify(eco_data)
+    except Exception as e:
+        emoji_log(logger, logging.ERROR, f"Error retrieving ECO descriptions: {str(e)}", "❌")
+        return jsonify({"error": str(e)}), 500
+
 ################################################################################
 # VI. MAIN ENTRY POINT
 ################################################################################
@@ -1039,4 +1073,4 @@ def main():
     app.run(debug=True)
     
 if __name__ == "__main__":
-    main()  
+    main()

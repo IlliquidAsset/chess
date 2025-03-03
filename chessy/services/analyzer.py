@@ -31,8 +31,20 @@ class GameAnalyzer:
         self.username = config.USERNAME
         self.logger = logging.getLogger(__name__)
         
+        # Progress tracking
+        self.progress_callback = None
+        
         # Ensure analysis directory exists
         os.makedirs(os.path.dirname(self.analysis_file), exist_ok=True)
+        
+    def set_progress_callback(self, callback):
+        """
+        Set a callback function for progress tracking.
+        
+        Args:
+            callback: Function that takes (current, total) as parameters
+        """
+        self.progress_callback = callback
         
     def analyze_games(self, games_data):
         """
@@ -45,13 +57,14 @@ class GameAnalyzer:
             list: Analysis results
         """
         analysis_results = []
+        total_games = len(games_data)
         
         # Check if Stockfish is available
         if not self.stockfish_path or not os.path.exists(self.stockfish_path):
             emoji_log(self.logger, logging.WARNING, 
                      "Stockfish not available. Skipping detailed move analysis.", "⚠️")
             # Even without Stockfish, we still want to save basic game data
-            for game_info in games_data:
+            for i, game_info in enumerate(games_data):
                 analysis_result = {
                     **game_info,
                     "blunders": 0,
@@ -59,6 +72,10 @@ class GameAnalyzer:
                     "move_count": game_info.get("NumMoves", 0)
                 }
                 analysis_results.append(analysis_result)
+                
+                # Update progress
+                if self.progress_callback and total_games > 0:
+                    self.progress_callback(i + 1, total_games)
             
             # Save basic analysis
             self._save_analysis_results(analysis_results)
@@ -70,7 +87,11 @@ class GameAnalyzer:
             time_trouble_blunders = 0
             
             with chess.engine.SimpleEngine.popen_uci(self.stockfish_path) as engine:
-                for game_info in games_data:
+                for i, game_info in enumerate(games_data):
+                    # Update progress
+                    if self.progress_callback and total_games > 0:
+                        self.progress_callback(i + 1, total_games)
+                    
                     # Get PGN text from source file
                     pgn_file = game_info.get("source_file")
                     if not pgn_file or not os.path.exists(pgn_file):
@@ -203,7 +224,7 @@ class GameAnalyzer:
             self.logger.exception("Detailed exception:")
             
             # Even if analysis fails, still save basic game data
-            for game_info in games_data:
+            for i, game_info in enumerate(games_data):
                 analysis_result = {
                     **game_info,
                     "blunders": 0,
@@ -211,6 +232,10 @@ class GameAnalyzer:
                     "move_count": game_info.get("NumMoves", 0)
                 }
                 analysis_results.append(analysis_result)
+                
+                # Update progress
+                if self.progress_callback and total_games > 0:
+                    self.progress_callback(i + 1, total_games)
             
             # Save basic analysis
             self._save_analysis_results(analysis_results)
@@ -310,6 +335,12 @@ class GameAnalyzer:
             dict: Various game statistics
         """
         if not os.path.exists(self.analysis_file):
+            # Create an empty analysis file
+            try:
+                with open(self.analysis_file, "w") as f:
+                    json.dump([], f)
+            except Exception as e:
+                self.logger.error(f"Error creating empty analysis file: {str(e)}")
             return {"total_games": 0}
             
         try:
