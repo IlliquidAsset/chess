@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Chessy - Chess.com Game Analysis{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    {% block extra_css %}{% endblock %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body class="{{ session.get('theme', 'light') }}">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <span class="chessy-logo">♟️ Chessy</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/games' %}active{% endif %}" href="/games">Games</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/openings' %}active{% endif %}" href="/openings">Openings</a>
+                    </li>
+                    {% if request.path == '/blunders' or request.path == '/inaccuracies' %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/blunders' %}active{% endif %}" href="/blunders">Blunders</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/inaccuracies' %}active{% endif %}" href="/inaccuracies">Inaccuracies</a>
+                    </li>
+                    {% endif %}
+                </ul>
+                <div class="ms-auto">
+                    <button id="themeToggle" class="btn btn-outline-light btn-sm">
+                        <i class="bi bi-moon-stars"></i> Toggle Theme
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container mt-4 mb-4">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Content Block -->
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer bg-dark text-light py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4">
+                    <h5>Chessy</h5>
+                    <p class="small">A Chess.com game analysis tool</p>
+                    <p class="small mb-0">&copy; 2025 Kendrick Kirk</p>
+                </div>
+                <div class="col-md-4 text-md-center">
+                    <h5>Connect</h5>
+                    <div class="social-links">
+                        <a href="https://www.kendrickcreates.com" target="_blank" class="text-light me-3">
+                            <i class="bi bi-globe"></i>
+                        </a>
+                        <a href="https://linkedin.com/in/KKirk" target="_blank" class="text-light me-3">
+                            <i class="bi bi-linkedin"></i>
+                        </a>
+                        <a href="https://instagram.com/KendrickCreates" target="_blank" class="text-light me-3">
+                            <i class="bi bi-instagram"></i>
+                        </a>
+                        <a href="https://about.me/KendrickKirk" target="_blank" class="text-light">
+                            <i class="bi bi-person-circle"></i>
+                        </a>
+                    </div>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <h5>Resources</h5>
+                    <ul class="list-unstyled">
+                        <li><a href="https://www.chess.com/api" target="_blank" class="text-light">Chess.com API</a></li>
+                        <li><a href="https://github.com/niklasf/python-chess" target="_blank" class="text-light">Python Chess</a></li>
+                        <li><a href="https://stockfishchess.org/" target="_blank" class="text-light">Stockfish</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/ECO_codes_library.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+    <script>
+        // Theme toggle functionality
+        document.getElementById('themeToggle').addEventListener('click', function() {
+            fetch('/api/toggle_theme', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.body.className = data.theme;
+            })
+            .catch(error => {
+                console.error('Error toggling theme:', error);
+            });
+        });
+    </script>
+</body>
+</html>
