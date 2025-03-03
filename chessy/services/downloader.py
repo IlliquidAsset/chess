@@ -6,8 +6,29 @@ import time
 import os
 from datetime import datetime
 import logging
-from ..utils.logging import emoji_log
+from urllib.parse import urlparse
+import concurrent.futures
+import threading
+from queue import Queue
 
+################################################################################
+# I. CONSTANTS AND CONFIGURATION
+################################################################################
+# Default timeout for HTTP requests
+DEFAULT_TIMEOUT = 30
+
+# Maximum number of retries for failed requests
+MAX_RETRIES = 3
+
+# Base delay (in seconds) between retries
+RETRY_DELAY = 2
+
+# Thread-local storage for maintaining context
+thread_local = threading.local()
+
+################################################################################
+# II. DOWNLOADER CLASS
+################################################################################
 class ChessComDownloader:
     def __init__(self, username, headers, archive_file, last_downloaded_file):
         """
@@ -23,10 +44,34 @@ class ChessComDownloader:
         self.headers = headers
         self.archive_file = archive_file
         self.last_downloaded_file = last_downloaded_file
-        self.output_dir = os.path.dirname(archive_file)  # This should now be games_dir
+        self.output_dir = os.path.dirname(archive_file)
         os.makedirs(self.output_dir, exist_ok=True)
         self.logger = logging.getLogger(__name__)
         
+        # Queue for storing downloaded PGNs
+        self.pgn_queue = Queue()
+        
+    def log(self, level, message, emoji=""):
+        """
+        Log a message with an optional emoji prefix.
+        """
+        if emoji:
+            message = f"{emoji} {message}"
+        
+        if level == logging.DEBUG:
+            self.logger.debug(message)
+        elif level == logging.INFO:
+            self.logger.info(message)
+        elif level == logging.WARNING:
+            self.logger.warning(message)
+        elif level == logging.ERROR:
+            self.logger.error(message)
+        elif level == logging.CRITICAL:
+            self.logger.critical(message)
+    
+    ################################################################################
+    # III. ARCHIVE MANAGEMENT
+    ################################################################################
     def fetch_archives(self):
         """
         Fetches available game archives from Chess.com.
@@ -35,16 +80,23 @@ class ChessComDownloader:
         url = f"https://api.chess.com/pub/player/{self.username}/games/archives"
         
         try:
-            response = requests.get(url, headers=self.headers)
+            # Create a dedicated session for this request
+            session = requests.Session()
+            response = session.get(url, headers=self.headers, timeout=DEFAULT_TIMEOUT)
             response.raise_for_status()  # Raise exception for 4XX/5XX responses
             
-            return response.json().get('archives', [])
+            archives = response.json().get('archives', [])
+            self.log(logging.INFO, f"Found {len(archives)} archives for {self.username}", "📚")
+            return archives
+            
         except requests.exceptions.RequestException as e:
-            emoji_log(self.logger, logging.ERROR, f"Error fetching archives: {str(e)}", "❌")
+            self.log(logging.ERROR, f"Error fetching archives: {str(e)}", "❌")
             return []
         except requests.exceptions.JSONDecodeError:
-            emoji_log(self.logger, logging.ERROR, "Invalid JSON response received", "❌")
+            self.log(logging.ERROR, "Invalid JSON response received", "❌")
             return []
+        finally:
+            session.close()
     
     def get_last_downloaded_datetime(self):
         """
@@ -53,30 +105,99 @@ class ChessComDownloader:
         """
         if os.path.exists(self.last_downloaded_file):
             with open(self.last_downloaded_file, "r") as f:
-                content = f.read().strip()
-                if content:
-                    try:
-                        # Try to parse the timestamp
-                        return content
-                    except ValueError:
-                        emoji_log(self.logger, logging.WARNING, 
-                                 f"Invalid timestamp in last_downloaded.txt: {content}", "⚠️")
+                return f.read().strip()
         return None
     
     def save_last_downloaded_datetime(self):
         """
-        Saves the most recent timestamp to prevent duplicate downloads.
-        Uses current date as YYYY/MM format to match Chess.com's archive format.
+        Saves the most recent timestamp (YYYY.MM.DD-HH.MM.SS) to prevent duplicate downloads.
         """
-        current_date = datetime.now()
-        timestamp = f"{current_date.year}/{current_date.month:02d}"
-        
+        timestamp = datetime.now().strftime("%Y.%m.%d-%H.%M.%S")
         with open(self.last_downloaded_file, "w") as f:
             f.write(timestamp)
-        
-        emoji_log(self.logger, logging.INFO, 
-                 f"Updated last downloaded timestamp to {timestamp}", "📝")
     
+    ################################################################################
+    # IV. NETWORK OPERATIONS
+    ################################################################################
+    def download_archive(self, archive_url, last_downloaded_date=None):
+        """
+        Downloads a single archive with retries and error handling.
+        Returns the PGN text or None if it couldn't be downloaded.
+        """
+        archive_date = archive_url.split("/")[-2] + "/" + archive_url.split("/")[-1]  # Extract YYYY/MM format
+        
+        if last_downloaded_date and archive_date <= last_downloaded_date:
+            self.log(logging.INFO, f"Skipping already downloaded archive: {archive_date}", "⏭️")
+            return None
+            
+        retry_count = 0
+        while retry_count < MAX_RETRIES:
+            try:
+                # Create a dedicated session for this request
+                session = requests.Session()
+                
+                response = session.get(f"{archive_url}/pgn", 
+                                       headers=self.headers, 
+                                       timeout=DEFAULT_TIMEOUT)
+                
+                if response.status_code == 200:
+                    self.log(logging.INFO, f"Downloaded PGNs from {archive_date}", "📥")
+                    return response.text
+                elif response.status_code == 429:
+                    wait_time = 60 * (retry_count + 1)  # Exponential backoff
+                    self.log(logging.WARNING, 
+                             f"Rate limit exceeded. Waiting {wait_time} seconds...", "⏱️")
+                    time.sleep(wait_time)
+                    retry_count += 1
+                else:
+                    self.log(logging.ERROR, 
+                             f"Failed to fetch PGNs: HTTP {response.status_code}", "❌")
+                    retry_count += 1
+                    time.sleep(RETRY_DELAY * (2 ** retry_count))  # Exponential backoff
+                    
+            except requests.exceptions.RequestException as e:
+                self.log(logging.ERROR, 
+                         f"Error downloading archive {archive_url}: {str(e)}", "❌")
+                retry_count += 1
+                time.sleep(RETRY_DELAY * (2 ** retry_count))  # Exponential backoff
+            finally:
+                session.close()
+        
+        # If we've exhausted all retries
+        self.log(logging.ERROR, 
+                 f"Failed to download archive after {MAX_RETRIES} attempts: {archive_url}", "❌")
+        return None
+    
+    def download_archives_parallel(self, archive_urls, last_downloaded_date=None, max_workers=5):
+        """
+        Downloads multiple archives in parallel for improved performance.
+        Returns a list of successful PGN texts.
+        """
+        pgn_texts = []
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all download tasks
+            future_to_url = {
+                executor.submit(self.download_archive, url, last_downloaded_date): url 
+                for url in archive_urls
+            }
+            
+            # Process completed tasks
+            for future in concurrent.futures.as_completed(future_to_url):
+                url = future_to_url[future]
+                try:
+                    pgn_text = future.result()
+                    if pgn_text:
+                        pgn_texts.append(pgn_text)
+                except Exception as e:
+                    self.log(logging.ERROR, 
+                             f"Exception while downloading {url}: {str(e)}", "❌")
+                    
+        return pgn_texts
+    
+    ################################################################################
+    # V. PUBLIC API
+    ################################################################################
     def fetch_and_save_games(self):
         """
         Downloads new PGNs from Chess.com and saves them to the archive.
@@ -87,72 +208,39 @@ class ChessComDownloader:
         Returns:
             str or None: Path to the file containing newly downloaded games, or None if no new games
         """
-        emoji_log(self.logger, logging.INFO, f"Checking for new games for {self.username}...", "🔍")
+        self.log(logging.INFO, f"Checking for new games for {self.username}...", "🔍")
         
-        archives = sorted(self.fetch_archives())  # Sort to process chronologically
-        last_downloaded_date = self.get_last_downloaded_datetime()
-        new_pgns = ""
-        from_date = None
-        
-        for archive_url in archives:
-            # Extract YYYY/MM format from URL
-            archive_date = archive_url.split("/")[-2] + "/" + archive_url.split("/")[-1]
-            
-            if last_downloaded_date and archive_date <= last_downloaded_date:
-                emoji_log(self.logger, logging.INFO, f"Skipping already downloaded archive: {archive_date}", "⏭️")
-                continue
-            
-            # Track the earliest date for naming the file
-            if from_date is None:
-                from_date = archive_date.replace("/", ".")
-            
-            try:
-                # Respect rate limits
-                time.sleep(1)
-                
-                response = requests.get(f"{archive_url}/pgn", headers=self.headers)
-                
-                if response.status_code == 200:
-                    emoji_log(self.logger, logging.INFO, f"Downloaded PGNs from {archive_date}", "📥")
-                    new_pgns += response.text + "\n\n"
-                elif response.status_code == 429:
-                    emoji_log(self.logger, logging.WARNING, "Rate limit exceeded. Waiting 60 seconds...", "⏱️")
-                    time.sleep(60)
-                    
-                    # Retry after waiting
-                    retry_response = requests.get(f"{archive_url}/pgn", headers=self.headers)
-                    if retry_response.status_code == 200:
-                        new_pgns += retry_response.text + "\n\n"
-                    else:
-                        emoji_log(self.logger, logging.ERROR, f"Failed to fetch PGNs after retry: {retry_response.status_code}", "❌")
-                else:
-                    emoji_log(self.logger, logging.ERROR, f"Failed to fetch PGNs: {response.status_code}", "❌")
-            
-            except Exception as e:
-                emoji_log(self.logger, logging.ERROR, f"Error downloading archive {archive_url}: {str(e)}", "❌")
-        
-        if not new_pgns.strip():
-            emoji_log(self.logger, logging.INFO, "No new games found", "ℹ️")
+        archives = self.fetch_archives()
+        if not archives:
+            self.log(logging.WARNING, "No archives found or error fetching archives", "⚠️")
             return None
-        
-        # Use proper date format for the new file
-        to_date = datetime.now().strftime("%Y.%m.%d")
-        if from_date is None:
-            from_date = to_date  # Fallback if from_date wasn't set
             
-        new_pgn_file = os.path.join(self.output_dir, f"{self.username}_GameArchive_{from_date}-{to_date}.pgn")
+        last_downloaded_date = self.get_last_downloaded_datetime()
+        
+        # Download archives in parallel
+        pgn_texts = self.download_archives_parallel(archives, last_downloaded_date)
+        
+        if not pgn_texts:
+            self.log(logging.INFO, "No new games found", "ℹ️")
+            return None
+            
+        # Combine all PGN texts
+        combined_pgns = "\n\n".join(pgn_texts)
         
         # Save newly downloaded games to a separate file
+        date_str = datetime.now().strftime("%Y.%m.%d")
+        new_pgn_file = os.path.join(self.output_dir, f"{self.username}_GameArchive_{date_str}.pgn")
+        
         with open(new_pgn_file, "w") as recent_file:
-            recent_file.write(new_pgns)
+            recent_file.write(combined_pgns)
         
         # Append to archive file
         with open(self.archive_file, "a") as archive:
-            archive.write(new_pgns)
+            archive.write(combined_pgns)
         
         # Count games (approximate by counting [Event tags)
-        game_count = new_pgns.count('[Event "')
-        emoji_log(self.logger, logging.INFO, f"Added {game_count} games to archive", "✅")
+        game_count = combined_pgns.count('[Event "')
+        self.log(logging.INFO, f"Added {game_count} games to archive", "✅")
         
         # Update last downloaded tracker
         self.save_last_downloaded_datetime()

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chessy - Blunders Analysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body class="{{ session.get('theme', 'light') }}">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <span class="chessy-logo">♟️ Chessy</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/games">Games</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/openings">Openings</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/blunders">Blunders</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/inaccuracies">Inaccuracies</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <button id="themeToggle" class="btn btn-outline-light btn-sm">
+                            <i class="bi bi-moon"></i> Toggle Theme
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <h1>Blunders Analysis</h1>
+        <p class="lead">Detailed analysis of blunders in your games</p>
+        
+        {% if not blunders_data %}
+            <div class="alert alert-warning">
+                <h4 class="alert-heading">No Analysis Available</h4>
+                <p>No blunder analysis data is available yet. Go to the Dashboard and click "Analyze Games" to generate metrics.</p>
+            </div>
+        {% else %}
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card stats-card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">Total Blunders</h5>
+                            <h2 class="display-4">{{ blunders_data.total_blunders }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stats-card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">Average Per Game</h5>
+                            <h2 class="display-4">{{ blunders_data.avg_blunders|round(2) }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stats-card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">Most Common Time Control</h5>
+                            <h2 class="display-4" id="most-common-tc">-</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Blunders by Time Control</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="blunders_chart" style="height: 400px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Blunders by Time Control (Detail)</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Time Control</th>
+                                    <th>Games</th>
+                                    <th>Total Blunders</th>
+                                    <th>Avg. Blunders/Game</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tc, data in blunders_data.by_time_control.items() %}
+                                <tr>
+                                    <td>{{ tc }}</td>
+                                    <td>{{ data.games }}</td>
+                                    <td>{{ data.blunders }}</td>
+                                    <td>{{ data.avg|round(2) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme toggle
+            document.getElementById('themeToggle').addEventListener('click', function() {
+                fetch('/api/toggle_theme', {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    document.body.className = data.theme;
+                });
+            });
+            
+            {% if blunders_data and blunders_data.by_time_control %}
+                // Find most common time control
+                let maxGames = 0;
+                let mostCommonTC = '';
+                
+                {% for tc, data in blunders_data.by_time_control.items() %}
+                    if ({{ data.games }} > maxGames) {
+                        maxGames = {{ data.games }};
+                        mostCommonTC = '{{ tc }}';
+                    }
+                {% endfor %}
+                
+                document.getElementById('most-common-tc').textContent = mostCommonTC;
+                
+                // Create chart data
+                const timeControls = [];
+                const blundersPerGame = [];
+                const totalGames = [];
+                
+                {% for tc, data in blunders_data.by_time_control.items() %}
+                    timeControls.push('{{ tc }}');
+                    blundersPerGame.push({{ data.avg }});
+                    totalGames.push({{ data.games }});
+                {% endfor %}
+                
+                const trace = {
+                    x: timeControls,
+                    y: blundersPerGame,
+                    type: 'bar',
+                    text: totalGames.map(g => `${g} games`),
+                    marker: {
+                        color: 'rgba(219, 64, 82, 0.7)'
+                    }
+                };
+                
+                const layout = {
+                    title: 'Average Blunders by Time Control',
+                    xaxis: {
+                        title: 'Time Control'
+                    },
+                    yaxis: {
+                        title: 'Avg. Blunders per Game'
+                    }
+                };
+                
+                Plotly.newPlot('blunders_chart', [trace], layout);
+            {% endif %}
+        });
+    </script>
+</body>
+</html>

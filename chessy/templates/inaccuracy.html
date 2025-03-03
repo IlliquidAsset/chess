@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chessy - Inaccuracies Analysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <span class="chessy-logo">♟️ Chessy</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/games">Games</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/openings">Openings</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/mistakes">Mistakes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/blunders">Blunders</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/inaccuracies">Inaccuracies</a>
+                    </li>
+                </ul>
+                <div class="ms-auto">
+                    <button id="darkModeToggle" class="btn btn-outline-light btn-sm">
+                        <i class="bi bi-moon-stars"></i> Dark Mode
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <h1>Inaccuracies Analysis</h1>
+        <p class="lead">Detailed analysis of your chess inaccuracies</p>
+        
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Average Inaccuracies Per Game</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="avg_inaccuracies_chart" style="height: 300px;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Overview</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Total Inaccuracies:</span>
+                            <span class="badge bg-warning rounded-pill fs-6">{{ total_inaccuracies }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Avg. Per Game:</span>
+                            <span class="badge bg-info rounded-pill fs-6">{{ avg_inaccuracies }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Most Common Phase:</span>
+                            <span class="badge bg-primary rounded-pill fs-6">{{ common_phase }}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Inaccuracies by Game Phase</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="phase_chart" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Inaccuracies by Opening</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="opening_inaccuracies_chart" style="height: 400px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Recent Games with Inaccuracies</h5>
+                        <div>
+                            <input type="text" id="gameSearch" class="form-control form-control-sm" placeholder="Search games...">
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Opponent</th>
+                                        <th>Result</th>
+                                        <th>Inaccuracies</th>
+                                        <th>Opening (ECO)</th>
+                                        <th>Time Control</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for game in inaccuracy_games %}
+                                    <tr>
+                                        <td>{{ game.date }}</td>
+                                        <td>
+                                            {% if game.PlayedAs == "White" %}
+                                            vs. {{ game.black }}
+                                            {% else %}
+                                            vs. {{ game.white }}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if game.Result == "1-0" and game.PlayedAs == "White" or game.Result == "0-1" and game.PlayedAs == "Black" %}
+                                            <span class="badge bg-success">Win</span>
+                                            {% elif game.Result == "1/2-1/2" %}
+                                            <span class="badge bg-secondary">Draw</span>
+                                            {% else %}
+                                            <span class="badge bg-danger">Loss</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ game.inaccuracies }}</td>
+                                        <td><span class="eco-code" data-eco="{{ game.ECO }}">{{ game.ECO }}</span></td>
+                                        <td>{{ game.TimeControl }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Dark mode toggle
+        document.getElementById('darkModeToggle').addEventListener('click', function() {
+            document.body.classList.toggle('dark-mode');
+            const isDarkMode = document.body.classList.contains('dark-mode');
+            localStorage.setItem('darkMode', isDarkMode ? 'enabled' : 'disabled');
+        });
+        
+        // Check for dark mode preference
+        if (localStorage.getItem('darkMode') === 'enabled') {
+            document.body.classList.add('dark-mode');
+        }
+        
+        // Fetch inaccuracies data
+        fetch('/api/inaccuracies_data')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error("Error loading data:", data.error);
+                return;
+            }
+            
+            // Average inaccuracies chart
+            const timeLabels = data.avg_inaccuracies_by_month.map(d => d.month);
+            const inaccuraciesData = data.avg_inaccuracies_by_month.map(d => d.average);
+            
+            const avgTrace = {
+                x: timeLabels,
+                y: inaccuraciesData,
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Avg. Inaccuracies',
+                line: {
+                    color: 'rgba(255, 193, 7, 0.8)',
+                    width: 3
+                },
+                marker: {
+                    size: 8
+                }
+            };
+            
+            const avgLayout = {
+                title: 'Average Inaccuracies Per Game Over Time',
+                xaxis: {
+                    title: 'Month'
+                },
+                yaxis: {
+                    title: 'Average Inaccuracies'
+                }
+            };
+            
+            Plotly.newPlot('avg_inaccuracies_chart', [avgTrace], avgLayout);
+            
+            // Phase chart
+            const phaseCtx = document.getElementById('phase_chart').getContext('2d');
+            const phaseChart = new Chart(phaseCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Opening', 'Middlegame', 'Endgame'],
+                    datasets: [{
+                        data: [
+                            data.inaccuracies_by_phase.Opening,
+                            data.inaccuracies_by_phase.Middlegame,
+                            data.inaccuracies_by_phase.Endgame
+                        ],
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.7)',
+                            'rgba(255, 193, 7, 0.7)',
+                            'rgba(255, 99, 132, 0.7)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+            
+            // Opening inaccuracies chart
+            const openings = data.inaccuracies_by_opening.map(d => d.opening);
+            const openingCounts = data.inaccuracies_by_opening.map(d => d.count);
+            
+            const openingTrace = {
+                x: openings,
+                y: openingCounts,
+                type: 'bar',
+                marker: {
+                    color: 'rgba(255, 193, 7, 0.7)'
+                }
+            };
+            
+            const openingLayout = {
+                title: 'Inaccuracies by Opening',
+                xaxis: {
+                    title: 'ECO Code'
+                },
+                yaxis: {
+                    title: 'Number of Inaccuracies'
+                }
+            };
+            
+            Plotly.newPlot('opening_inaccuracies_chart', [openingTrace], openingLayout);
+        })
+        .catch(error => {
+            console.error("Error loading inaccuracies data:", error);
+        });
+        
+        // Simple search functionality
+        document.getElementById('gameSearch').addEventListener('keyup', function() {
+            let searchText = this.value.toLowerCase();
+            let tableRows = document.querySelectorAll('tbody tr');
+            
+            tableRows.forEach(row => {
+                let textContent = row.textContent.toLowerCase();
+                row.style.display = textContent.includes(searchText) ? '' : 'none';
+            });
+        });
+        
+        // ECO code tooltips
+        document.querySelectorAll('.eco-code').forEach(elem => {
+            elem.addEventListener('mouseover', async function(e) {
+                const ecoCode = this.dataset.eco;
+                if (!ecoCode) return;
+                
+                // Fetch ECO description
+                try {
+                    const response = await fetch(`/api/eco_description/${ecoCode}`);
+                    const data = await response.json();
+                    
+                    if (data.description) {
+                        // Create tooltip
+                        const tooltip = document.createElement('div');
+                        tooltip.className = 'eco-tooltip';
+                        tooltip.textContent = data.description;
+                        tooltip.style.position = 'absolute';
+                        tooltip.style.left = `${e.pageX + 10}px`;
+                        tooltip.style.top = `${e.pageY + 10}px`;
+                        tooltip.style.backgroundColor = 'rgba(0,0,0,0.8)';
+                        tooltip.style.color = 'white';
+                        tooltip.style.padding = '5px 10px';
+                        tooltip.style.borderRadius = '4px';
+                        tooltip.style.zIndex = '1000';
+                        tooltip.style.maxWidth = '300px';
+                        
+                        document.body.appendChild(tooltip);
+                        
+                        this.addEventListener('mouseout', function() {
+                            document.body.removeChild(tooltip);
+                        }, { once: true });
+                    }
+                } catch (error) {
+                    console.error("Error fetching ECO description:", error);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
