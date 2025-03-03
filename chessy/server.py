@@ -7,6 +7,7 @@ import csv
 import logging
 import threading
 import datetime
+import traceback
 from flask import Flask, render_template, jsonify, request, redirect, url_for, flash, session
 import pandas as pd
 
@@ -22,6 +23,9 @@ from chessy.services.analyzer import GameAnalyzer
 from chessy.services import ChessyService
 from chessy.utils.logging import setup_logging, emoji_log
 
+################################################################################
+# I. APPLICATION INITIALIZATION
+################################################################################
 # Initialize app
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # For flash messages
@@ -29,6 +33,28 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 # Setup logging
 logger = setup_logging(OUTPUT_DIR)
+
+# Track background tasks
+background_tasks = {
+    'download': {
+        'running': False,
+        'status': None,
+        'result': None,
+        'timestamp': None,
+        'messages': [],
+        'start_time': None,
+        'elapsed_seconds': 0
+    },
+    'analyze': {
+        'running': False,
+        'status': None,
+        'result': None,
+        'timestamp': None,
+        'messages': [],
+        'start_time': None,
+        'elapsed_seconds': 0
+    }
+}
 
 # Initialize services
 def init_services():
@@ -76,22 +102,9 @@ def init_services():
 # Initialize the service
 chessy_service = init_services()
 
-# Track background tasks
-background_tasks = {
-    'download': {
-        'running': False,
-        'status': None,
-        'result': None,
-        'timestamp': None
-    },
-    'analyze': {
-        'running': False,
-        'status': None,
-        'result': None,
-        'timestamp': None
-    }
-}
-
+################################################################################
+# II. UTILITY FUNCTIONS
+################################################################################
 # Ensure all required files exist
 def ensure_required_files():
     """Ensure necessary files exist for the application to function."""
@@ -142,7 +155,84 @@ def get_date_range():
         emoji_log(logger, logging.ERROR, f"Error getting date range: {str(e)}", "❌")
         return {"start": None, "end": None}
 
-# API Routes
+################################################################################
+# III. BACKGROUND TASKS
+################################################################################
+def download_thread(app_context):
+    """Background thread for downloading games."""
+    with app_context:
+        try:
+            background_tasks['download']['running'] = True
+            background_tasks['download']['status'] = "Running"
+            background_tasks['download']['messages'] = ["Starting download..."]
+            background_tasks['download']['start_time'] = datetime.datetime.now()
+            
+            # Trigger game download
+            background_tasks['download']['messages'].append("Checking for new games...")
+            new_games = chessy_service.check_for_updates()
+            
+            if new_games > 0:
+                background_tasks['download']['messages'].append(f"Found {new_games} new games")
+                background_tasks['download']['status'] = f"Downloaded {new_games} new games"
+                background_tasks['download']['result'] = new_games
+            else:
+                background_tasks['download']['messages'].append("No new games found")
+                background_tasks['download']['status'] = "No new games found"
+                background_tasks['download']['result'] = 0
+                
+            background_tasks['download']['timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            end_time = datetime.datetime.now()
+            background_tasks['download']['elapsed_seconds'] = (end_time - background_tasks['download']['start_time']).total_seconds()
+                
+        except Exception as e:
+            error_msg = f"Download error: {str(e)}"
+            emoji_log(logger, logging.ERROR, error_msg, "❌")
+            background_tasks['download']['status'] = f"Error: {str(e)}"
+            background_tasks['download']['messages'].append(error_msg)
+            
+            # Log detailed traceback
+            traceback_text = traceback.format_exc()
+            logger.error(f"Detailed error:\n{traceback_text}")
+            
+        finally:
+            background_tasks['download']['running'] = False
+
+def analyze_thread(app_context):
+    """Background thread for analyzing games."""
+    with app_context:
+        try:
+            background_tasks['analyze']['running'] = True
+            background_tasks['analyze']['status'] = "Running"
+            background_tasks['analyze']['messages'] = ["Starting analysis..."]
+            background_tasks['analyze']['start_time'] = datetime.datetime.now()
+            
+            # Trigger game analysis
+            background_tasks['analyze']['messages'].append("Processing games...")
+            results = chessy_service.process_new_games()
+            
+            background_tasks['analyze']['messages'].append(f"Completed: {results['analyzed_games']} games analyzed")
+            background_tasks['analyze']['status'] = f"Completed: {results['analyzed_games']} games analyzed"
+            background_tasks['analyze']['result'] = results
+            background_tasks['analyze']['timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            end_time = datetime.datetime.now()
+            background_tasks['analyze']['elapsed_seconds'] = (end_time - background_tasks['analyze']['start_time']).total_seconds()
+                
+        except Exception as e:
+            error_msg = f"Analysis error: {str(e)}"
+            emoji_log(logger, logging.ERROR, error_msg, "❌")
+            background_tasks['analyze']['status'] = f"Error: {str(e)}"
+            background_tasks['analyze']['messages'].append(error_msg)
+            
+            # Log detailed traceback
+            traceback_text = traceback.format_exc()
+            logger.error(f"Detailed error:\n{traceback_text}")
+            
+        finally:
+            background_tasks['analyze']['running'] = False
+
+################################################################################
+# IV. ROUTE HANDLERS
+################################################################################
 @app.route("/")
 def index():
     """Main dashboard page."""
@@ -169,31 +259,6 @@ def index():
         task_status=task_status
     )
 
-def download_thread(app_context):
-    """Background thread for downloading games."""
-    with app_context:
-        try:
-            background_tasks['download']['running'] = True
-            background_tasks['download']['status'] = "Running"
-            
-            # Trigger game download
-            new_games = chessy_service.check_for_updates()
-            
-            if new_games > 0:
-                background_tasks['download']['status'] = f"Downloaded {new_games} new games"
-                background_tasks['download']['result'] = new_games
-            else:
-                background_tasks['download']['status'] = "No new games found"
-                background_tasks['download']['result'] = 0
-                
-            background_tasks['download']['timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                
-        except Exception as e:
-            emoji_log(logger, logging.ERROR, f"Download error: {str(e)}", "❌")
-            background_tasks['download']['status'] = f"Error: {str(e)}"
-        finally:
-            background_tasks['download']['running'] = False
-
 @app.route("/download", methods=["POST"])
 def download_games():
     """Download games from Chess.com."""
@@ -213,28 +278,16 @@ def download_games():
     thread.daemon = True
     thread.start()
     
+    # For AJAX requests, return JSON
+    if request.is_json:
+        return jsonify({
+            "status": "success",
+            "message": "Download started"
+        })
+    
+    # For form submissions, redirect with flash message
     flash("Download started in background. Refresh page to check status.", "info")
     return redirect(url_for("index"))
-
-def analyze_thread(app_context):
-    """Background thread for analyzing games."""
-    with app_context:
-        try:
-            background_tasks['analyze']['running'] = True
-            background_tasks['analyze']['status'] = "Running"
-            
-            # Trigger game analysis
-            results = chessy_service.process_new_games()
-            
-            background_tasks['analyze']['status'] = f"Completed: {results['analyzed_games']} games analyzed"
-            background_tasks['analyze']['result'] = results
-            background_tasks['analyze']['timestamp'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                
-        except Exception as e:
-            emoji_log(logger, logging.ERROR, f"Analysis error: {str(e)}", "❌")
-            background_tasks['analyze']['status'] = f"Error: {str(e)}"
-        finally:
-            background_tasks['analyze']['running'] = False
 
 @app.route("/analyze", methods=["POST"])
 def analyze_games():
@@ -255,6 +308,14 @@ def analyze_games():
     thread.daemon = True
     thread.start()
     
+    # For AJAX requests, return JSON
+    if request.is_json:
+        return jsonify({
+            "status": "success",
+            "message": "Analysis started"
+        })
+    
+    # For form submissions, redirect with flash message
     flash("Analysis started in background. Refresh page to check status.", "info")
     return redirect(url_for("index"))
 
@@ -299,21 +360,25 @@ def openings():
     # Load ECO descriptions
     eco_descriptions = {}
     try:
-        # TODO: Replace with actual ECO descriptions file
-        # For now, use some common examples
-        eco_descriptions = {
-            "A00": "Irregular Openings",
-            "A40": "Queen's Pawn",
-            "A45": "Queen's Pawn Game",
-            "B00": "Uncommon King's Pawn Opening",
-            "B20": "Sicilian Defence",
-            "B27": "Sicilian Defense",
-            "C00": "French Defense",
-            "C20": "King's Pawn Game",
-            "D00": "Queen's Pawn Game",
-            "D02": "Queen's Pawn Game",
-            "E00": "Queen's Pawn, Indian Defenses"
-        }
+        # Try to load from ECO codes module
+        try:
+            from chessy.utils.ECO_codes_library import get_eco_descriptions
+            eco_descriptions = get_eco_descriptions()
+        except ImportError:
+            # Fall back to common examples
+            eco_descriptions = {
+                "A00": "Irregular Openings",
+                "A40": "Queen's Pawn",
+                "A45": "Queen's Pawn Game",
+                "B00": "Uncommon King's Pawn Opening",
+                "B20": "Sicilian Defence",
+                "B27": "Sicilian Defense",
+                "C00": "French Defense",
+                "C20": "King's Pawn Game",
+                "D00": "Queen's Pawn Game",
+                "D02": "Queen's Pawn Game",
+                "E00": "Queen's Pawn, Indian Defenses"
+            }
     except Exception as e:
         emoji_log(logger, logging.ERROR, f"Error loading ECO descriptions: {str(e)}", "❌")
     
@@ -385,52 +450,99 @@ def inaccuracies():
         return redirect(url_for("index"))
     
     # Get inaccuracies data if available
-    inaccuracies_data = {}
+    inaccuracy_data = {}
+    total_inaccuracies = 0
+    avg_inaccuracies = 0
+    common_phase = "Opening"
+    inaccuracy_games = []
+    
     try:
         if os.path.exists(GAME_ANALYSIS_FILE):
             with open(GAME_ANALYSIS_FILE, "r") as f:
                 games_data = json.load(f)
                 
             if games_data:
-                # Calculate average inaccuracies per game
+                # Calculate totals
                 total_inaccuracies = sum(game.get("inaccuracies", 0) for game in games_data)
                 total_games = len(games_data)
-                avg_inaccuracies = total_inaccuracies / total_games if total_games > 0 else 0
+                avg_inaccuracies = round(total_inaccuracies / total_games, 2) if total_games > 0 else 0
                 
-                # Group inaccuracies by time control
-                inaccuracies_by_tc = {}
+                # Add inaccuracy count to game data for display
                 for game in games_data:
-                    tc = game.get("TimeControl", "Unknown")
                     inaccuracies = game.get("inaccuracies", 0)
-                    
-                    if tc not in inaccuracies_by_tc:
-                        inaccuracies_by_tc[tc] = {"games": 0, "inaccuracies": 0}
-                    
-                    inaccuracies_by_tc[tc]["games"] += 1
-                    inaccuracies_by_tc[tc]["inaccuracies"] += inaccuracies
+                    if inaccuracies > 0:
+                        game_copy = game.copy()
+                        game_copy["inaccuracies"] = inaccuracies
+                        inaccuracy_games.append(game_copy)
                 
-                # Calculate averages
-                for tc in inaccuracies_by_tc:
-                    inaccuracies_by_tc[tc]["avg"] = (
-                        inaccuracies_by_tc[tc]["inaccuracies"] / inaccuracies_by_tc[tc]["games"]
-                        if inaccuracies_by_tc[tc]["games"] > 0 else 0
-                    )
-                
-                inaccuracies_data = {
-                    "total_inaccuracies": total_inaccuracies,
-                    "avg_inaccuracies": avg_inaccuracies,
-                    "by_time_control": inaccuracies_by_tc
-                }
+                # Sort games by number of inaccuracies (most first)
+                inaccuracy_games = sorted(
+                    inaccuracy_games,
+                    key=lambda x: x.get("inaccuracies", 0),
+                    reverse=True
+                )[:20]  # Show only top 20
     except Exception as e:
         emoji_log(logger, logging.ERROR, f"Error loading inaccuracies data: {str(e)}", "❌")
     
     return render_template(
-        "inaccuracies.html",
+        "inaccuracy.html",
         username=USERNAME,
-        inaccuracies_data=inaccuracies_data
+        total_inaccuracies=total_inaccuracies,
+        avg_inaccuracies=avg_inaccuracies,
+        common_phase=common_phase,
+        inaccuracy_games=inaccuracy_games
     )
 
-# API endpoints for data
+@app.route("/errors/download")
+def download_error():
+    """Display download error page."""
+    return render_template("errors/download.html", username=USERNAME)
+
+@app.route("/errors/analysis")
+def analysis_error():
+    """Display analysis error page."""
+    return render_template("errors/analysis.html", username=USERNAME)
+
+@app.route("/errors/not_found")
+def not_found_error():
+    """Display 404 page."""
+    return render_template("errors/not_found.html", username=USERNAME)
+
+################################################################################
+# V. API ENDPOINTS
+################################################################################
+@app.route("/api/progress")
+def get_progress():
+    """Get current progress of background tasks."""
+    # Update elapsed time
+    if background_tasks['download']['running'] and background_tasks['download']['start_time']:
+        elapsed = datetime.datetime.now() - background_tasks['download']['start_time']
+        background_tasks['download']['elapsed_seconds'] = int(elapsed.total_seconds())
+        
+    if background_tasks['analyze']['running'] and background_tasks['analyze']['start_time']:
+        elapsed = datetime.datetime.now() - background_tasks['analyze']['start_time']
+        background_tasks['analyze']['elapsed_seconds'] = int(elapsed.total_seconds())
+    
+    # Determine which task is active
+    active_task = None
+    if background_tasks['download']['running']:
+        active_task = 'download'
+    elif background_tasks['analyze']['running']:
+        active_task = 'analyze'
+    
+    if active_task:
+        return jsonify({
+            "active": True,
+            "task": active_task,
+            "status": background_tasks[active_task]['status'],
+            "messages": background_tasks[active_task]['messages'],
+            "elapsed_seconds": background_tasks[active_task]['elapsed_seconds']
+        })
+    else:
+        return jsonify({
+            "active": False
+        })
+
 @app.route("/api/game_data")
 def get_game_data():
     """Return game data as JSON."""
@@ -458,8 +570,106 @@ def get_eco_data():
         emoji_log(logger, logging.ERROR, f"Error retrieving ECO data: {str(e)}", "❌")
         return jsonify([])
 
+@app.route("/api/eco_description/<eco_code>")
+def get_eco_description(eco_code):
+    """Get description for a specific ECO code."""
+    try:
+        # Try to use the ECO codes library if available
+        try:
+            from chessy.utils.ECO_codes_library import get_eco_description
+            description = get_eco_description(eco_code)
+            return jsonify({"description": description})
+        except ImportError:
+            # Fallback to basic descriptions
+            descriptions = {
+                "A00": "Irregular Openings",
+                "B20": "Sicilian Defence",
+                "C00": "French Defense",
+                "D00": "Queen's Pawn Game",
+                # Add more as needed
+            }
+            return jsonify({"description": descriptions.get(eco_code, "Unknown opening")})
+    except Exception as e:
+        emoji_log(logger, logging.ERROR, f"Error retrieving ECO description: {str(e)}", "❌")
+        return jsonify({"description": "Error retrieving description"})
+
 @app.route("/api/charts/win_rate")
 def win_rate_chart():
+    """Generate win rate chart data."""
+    try:
+        if not os.path.exists(GAME_ANALYSIS_FILE):
+            return jsonify([])
+            
+        with open(GAME_ANALYSIS_FILE, "r") as f:
+            data = json.load(f)
+            
+        if not data:
+            return jsonify([])
+            
+        df = pd.DataFrame(data)
+        
+        # Handle different time control formats
+        def parse_time_control(tc):
+            """Parse time control into standardized categories."""
+            try:
+                if not tc:
+                    return "Unknown"
+                
+                # Handle time+increment format (e.g. "300+2")
+                if "+" in tc:
+                    base_time = int(tc.split("+")[0])
+                # Handle seconds only format
+                else:
+                    base_time = int(tc)
+                
+                if base_time < 180:
+                    return "Bullet"
+                elif base_time < 600:
+                    return "Blitz"
+                elif base_time < 1800:
+                    return "Rapid"
+                else:
+                    return "Classical"
+            except Exception:
+                # If we couldn't parse it, use the original value
+                return tc if tc else "Unknown"
+        
+        # Prepare time control groups
+        df['TimeControlGroup'] = df['TimeControl'].apply(parse_time_control)
+        
+        # Calculate win rates by time control
+        tc_stats = {}
+        for group, group_df in df.groupby('TimeControlGroup'):
+            if group == "Unknown" and len(group_df) < 5:  # Skip Unknown if it's just a few games
+                continue
+                
+            tc_stats[group] = {
+                'games': len(group_df),
+                'wins': sum((group_df['PlayedAs'] == 'White') & (group_df['Result'] == '1-0') | 
+                          (group_df['PlayedAs'] == 'Black') & (group_df['Result'] == '0-1')),
+                'losses': sum((group_df['PlayedAs'] == 'White') & (group_df['Result'] == '0-1') | 
+                            (group_df['PlayedAs'] == 'Black') & (group_df['Result'] == '1-0')),
+                'draws': sum(group_df['Result'] == '1/2-1/2')
+            }
+        
+        # Create chart data
+        chart_data = []
+        for tc, stats in tc_stats.items():
+            win_rate = stats['wins'] / stats['games'] * 100 if stats['games'] > 0 else 0
+            chart_data.append({
+                'timeControl': tc,
+                'winRate': round(win_rate, 1),
+                'games': stats['games']
+            })
+            
+        # Sort by number of games (descending)
+        chart_data = sorted(chart_data, key=lambda x: x['games'], reverse=True)
+            
+        return jsonify(chart_data)
+        
+    except Exception as e:
+        emoji_log(logger, logging.ERROR, f"Error generating win rate chart: {str(e)}", "❌")
+        return jsonify([])
     """Generate win rate chart data."""
     try:
         if not os.path.exists(GAME_ANALYSIS_FILE):
@@ -528,6 +738,203 @@ def win_rate_chart():
         emoji_log(logger, logging.ERROR, f"Error generating win rate chart: {str(e)}", "❌")
         return jsonify([])
 
+@app.route("/mistakes")
+def mistakes():
+    """View comprehensive mistakes statistics."""
+    if not chessy_service:
+        flash("Service not available. Check configuration and try again.", "error")
+        return redirect(url_for("index"))
+    
+    # Get game analysis data if available
+    analysis_data = {}
+    top_mistake_games = []
+    
+    try:
+        if os.path.exists(GAME_ANALYSIS_FILE):
+            with open(GAME_ANALYSIS_FILE, "r") as f:
+                games_data = json.load(f)
+                
+            if games_data:
+                # Calculate total mistakes
+                total_blunders = sum(game.get("blunders", 0) for game in games_data)
+                total_inaccuracies = sum(game.get("inaccuracies", 0) for game in games_data)
+                total_mistakes = total_blunders + total_inaccuracies
+                total_games = len(games_data)
+                
+                # Calculate game phase statistics (approximation)
+                opening_mistakes = 0
+                middlegame_mistakes = 0
+                endgame_mistakes = 0
+                
+                for game in games_data:
+                    # Simple approximation - distribute mistakes by phase
+                    # In a real implementation, this would use actual phase data from the analysis
+                    moves = game.get("move_count", 0)
+                    blunders = game.get("blunders", 0)
+                    inaccuracies = game.get("inaccuracies", 0)
+                    total = blunders + inaccuracies
+                    
+                    if moves <= 0:
+                        continue
+                        
+                    # Estimate phase distribution
+                    if moves <= 10:
+                        # Mostly opening
+                        opening_mistakes += total
+                    elif moves <= 30:
+                        # Split between opening and middlegame
+                        opening_mistakes += total * 0.3
+                        middlegame_mistakes += total * 0.7
+                    else:
+                        # Distribute across all phases
+                        opening_mistakes += total * 0.2
+                        middlegame_mistakes += total * 0.5
+                        endgame_mistakes += total * 0.3
+                
+                # Calculate mistakes by time control
+                tc_stats = {}
+                for game in games_data:
+                    tc = game.get("TimeControl", "Unknown")
+                    
+                    # Parse time control into standard categories
+                    try:
+                        if "+" in tc:
+                            base_time = int(tc.split("+")[0])
+                        else:
+                            base_time = int(tc)
+                            
+                        if base_time < 180:
+                            tc_category = "Bullet"
+                        elif base_time < 600:
+                            tc_category = "Blitz"
+                        elif base_time < 1800:
+                            tc_category = "Rapid"
+                        else:
+                            tc_category = "Classical"
+                    except:
+                        tc_category = tc if tc else "Unknown"
+                    
+                    mistakes = game.get("blunders", 0) + game.get("inaccuracies", 0)
+                    
+                    if tc_category not in tc_stats:
+                        tc_stats[tc_category] = 0
+                    tc_stats[tc_category] += mistakes
+                
+                # Sort games by total mistakes and get top 10
+                for game in games_data:
+                    game["total_mistakes"] = game.get("blunders", 0) + game.get("inaccuracies", 0)
+                
+                top_mistake_games = sorted(
+                    games_data,
+                    key=lambda x: x.get("total_mistakes", 0),
+                    reverse=True
+                )[:10]
+                
+                # Create trend data by month
+                month_data = {}
+                for game in games_data:
+                    date_str = game.get("date", "")
+                    if date_str and date_str != "????-??-??":
+                        month = date_str[:7]  # YYYY-MM format
+                        mistakes = game.get("blunders", 0) + game.get("inaccuracies", 0)
+                        
+                        if month not in month_data:
+                            month_data[month] = {"games": 0, "mistakes": 0}
+                        
+                        month_data[month]["games"] += 1
+                        month_data[month]["mistakes"] += mistakes
+                
+                # Calculate averages for trend data
+                trend_data = []
+                for month, data in sorted(month_data.items()):
+                    if data["games"] > 0:
+                        avg = data["mistakes"] / data["games"]
+                        trend_data.append((month, round(avg, 2)))
+                
+                analysis_data = {
+                    "blunders": total_blunders,
+                    "inaccuracies": total_inaccuracies,
+                    "total_mistakes": total_mistakes,
+                    "phase_stats": {
+                        "opening": int(opening_mistakes),
+                        "middlegame": int(middlegame_mistakes),
+                        "endgame": int(endgame_mistakes)
+                    },
+                    "time_control_stats": tc_stats,
+                    "trend_data": trend_data
+                }
+    except Exception as e:
+        emoji_log(logger, logging.ERROR, f"Error loading mistakes data: {str(e)}", "❌")
+    
+    return render_template(
+        "mistakes_overview.html",
+        username=USERNAME,
+        analysis_data=analysis_data,
+        top_mistake_games=top_mistake_games
+    )
+
+@app.route("/api/inaccuracies_data")
+def get_inaccuracies_data():
+    """Return inaccuracies data for charts."""
+    try:
+        if not os.path.exists(GAME_ANALYSIS_FILE):
+            return jsonify({"error": "No analysis data available"})
+            
+        with open(GAME_ANALYSIS_FILE, "r") as f:
+            games_data = json.load(f)
+            
+        if not games_data:
+            return jsonify({"error": "No games found"})
+            
+        # Group by ECO code
+        inaccuracies_by_opening = {}
+        for game in games_data:
+            eco = game.get("ECO", "Unknown")
+            if not eco:
+                eco = "Unknown"
+                
+            inaccuracies = game.get("inaccuracies", 0)
+            
+            if eco not in inaccuracies_by_opening:
+                inaccuracies_by_opening[eco] = {"count": 0, "games": 0}
+                
+            inaccuracies_by_opening[eco]["count"] += inaccuracies
+            inaccuracies_by_opening[eco]["games"] += 1
+            
+        # Format for chart
+        opening_data = [{"opening": eco, "count": data["count"]} 
+                        for eco, data in inaccuracies_by_opening.items() 
+                        if data["count"] > 0]
+                        
+        # Sort by count and take top 10
+        opening_data = sorted(opening_data, key=lambda x: x["count"], reverse=True)[:10]
+        
+        # Create dummy phase data (this would come from actual analysis in a real implementation)
+        phase_data = {
+            "Opening": 45,
+            "Middlegame": 35,
+            "Endgame": 20
+        }
+        
+        # Create dummy monthly data
+        monthly_data = [
+            {"month": "Jan", "average": 3.2},
+            {"month": "Feb", "average": 2.9},
+            {"month": "Mar", "average": 2.5},
+            {"month": "Apr", "average": 2.7},
+            {"month": "May", "average": 2.3}
+        ]
+        
+        return jsonify({
+            "inaccuracies_by_opening": opening_data,
+            "inaccuracies_by_phase": phase_data,
+            "avg_inaccuracies_by_month": monthly_data
+        })
+        
+    except Exception as e:
+        emoji_log(logger, logging.ERROR, f"Error generating inaccuracies data: {str(e)}", "❌")
+        return jsonify({"error": str(e)})
+
 @app.route("/api/export_games", methods=["POST"])
 def export_games():
     """Export filtered game data."""
@@ -560,6 +967,9 @@ def export_games():
             
         if filters.get("max_moves") is not None:
             filtered_data = [g for g in filtered_data if g.get("NumMoves", 0) <= filters["max_moves"]]
+
+        if not filtered_data:
+            return jsonify({"warning": "No games match the selected filters"}), 200
         
         # Generate filename
         filename = f"{USERNAME}_games_export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -593,26 +1003,6 @@ def export_games():
         emoji_log(logger, logging.ERROR, f"Error exporting games: {str(e)}", "❌")
         return jsonify({"error": str(e)}), 500
 
-@app.route("/api/eco_descriptions")
-def get_eco_descriptions():
-    """Return ECO code descriptions."""
-    # TODO: Replace with actual ECO descriptions from a database or file
-    # For now, return some common examples
-    descriptions = {
-        "A00": "Irregular Openings",
-        "A40": "Queen's Pawn",
-        "A45": "Queen's Pawn Game",
-        "B00": "Uncommon King's Pawn Opening",
-        "B20": "Sicilian Defence",
-        "B27": "Sicilian Defense",
-        "C00": "French Defense",
-        "C20": "King's Pawn Game",
-        "D00": "Queen's Pawn Game",
-        "D02": "Queen's Pawn Game",
-        "E00": "Queen's Pawn, Indian Defenses"
-    }
-    return jsonify(descriptions)
-
 @app.route("/api/toggle_theme", methods=["POST"])
 def toggle_theme():
     """Toggle between light and dark mode."""
@@ -625,7 +1015,20 @@ def toggle_theme():
         
     return jsonify({"theme": session["theme"]})
 
-# Run the application
+@app.errorhandler(404)
+def page_not_found(e):
+    """Handle 404 errors."""
+    return render_template("errors/not_found.html", username=USERNAME), 404
+
+@app.errorhandler(500)
+def server_error(e):
+    """Handle 500 errors."""
+    logger.error(f"Server error: {str(e)}")
+    return render_template("errors/server_error.html", username=USERNAME), 500
+
+################################################################################
+# VI. MAIN ENTRY POINT
+################################################################################
 def main():
     # Validate config before starting
     if not validate_config():
@@ -636,4 +1039,4 @@ def main():
     app.run(debug=True)
     
 if __name__ == "__main__":
-    main()
+    main()  

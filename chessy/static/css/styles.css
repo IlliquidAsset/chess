@@ -127,3 +127,107 @@ body {
     height: 300px;
   }
 }
+
+/* Spinner overlay */
+.spinner-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  color: white;
+  display: none;
+}
+
+.spinner-message {
+  margin-top: 20px;
+  max-width: 80%;
+  text-align: center;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+.pulse {
+  animation: pulse 2s infinite;
+}
+
+/* Sort icons */
+.sortable {
+  cursor: pointer;
+}
+
+.sortable i {
+  margin-left: 5px;
+}
+
+/* ECO tooltips */
+.eco-tooltip {
+  position: absolute;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 14px;
+  max-width: 300px;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+/* Dark Mode Styles */
+body.dark-mode {
+  background-color: #121212;
+  color: #e0e0e0;
+}
+
+.dark-mode .card {
+  background-color: #1e1e1e;
+  border-color: #333;
+}
+
+.dark-mode .card-header {
+  background-color: #252525;
+  border-color: #333;
+}
+
+.dark-mode .navbar {
+  background-color: #1a1a1a !important;
+}
+
+.dark-mode .table {
+  color: #e0e0e0;
+}
+
+.dark-mode .table th {
+  background-color: #252525;
+  border-color: #333;
+}
+
+.dark-mode .table td {
+  border-color: #333;
+}
+
+.dark-mode .table-hover tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.075);
+}
+
+.dark-mode .list-group-item {
+  background-color: #1e1e1e;
+  border-color: #333;
+  color: #e0e0e0;
+}
+
+.dark-mode .alert-warning {
+  background-color: #332b00;
+  color: #ffdc7a;
+  border-color: #665600;
+}

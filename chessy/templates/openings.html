@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chessy - Opening Statistics</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
@@ -28,7 +29,15 @@
                     <li class="nav-item">
                         <a class="nav-link active" href="/openings">Openings</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/mistakes">Mistakes</a>
+                    </li>
                 </ul>
+                <div class="navbar-nav ms-auto">
+                    <button id="darkModeToggle" class="btn btn-outline-light btn-sm">
+                        <i class="bi bi-moon"></i> <span>Dark Mode</span>
+                    </button>
+                </div>
             </div>
         </div>
     </nav>
@@ -56,7 +65,7 @@
                         <h5 class="card-title mb-0">Performance by Opening (White)</h5>
                     </div>
                     <div class="card-body">
-                        <div id="white_openings_chart" style="height: 400px;"></div>
+                        <div id="white_openings_chart" class="chart-container"></div>
                     </div>
                 </div>
             </div>
@@ -67,7 +76,7 @@
                         <h5 class="card-title mb-0">Performance by Opening (Black)</h5>
                     </div>
                     <div class="card-body">
-                        <div id="black_openings_chart" style="height: 400px;"></div>
+                        <div id="black_openings_chart" class="chart-container"></div>
                     </div>
                 </div>
             </div>
@@ -87,14 +96,14 @@
                     <table class="table table-hover table-striped mb-0">
                         <thead>
                             <tr>
-                                <th>ECO</th>
+                                <th class="sortable" data-sort="eco">ECO <i class="bi bi-arrow-down-short"></i></th>
                                 <th>White Games</th>
                                 <th>White W/D/L</th>
                                 <th>White Win %</th>
                                 <th>Black Games</th>
                                 <th>Black W/D/L</th>
                                 <th>Black Win %</th>
-                                <th>Total</th>
+                                <th class="sortable" data-sort="total">Total <i class="bi bi-arrow-down-short"></i></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -136,7 +145,66 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/ECO_codes_library.js') }}"></script>
     <script>
+        // Dark mode toggle functionality
+        document.getElementById('darkModeToggle').addEventListener('click', function() {
+            document.body.classList.toggle('dark-mode');
+            const isDarkMode = document.body.classList.contains('dark-mode');
+            localStorage.setItem('darkMode', isDarkMode ? 'enabled' : 'disabled');
+            
+            // Update icon and text
+            const icon = this.querySelector('i');
+            const text = this.querySelector('span');
+            if (isDarkMode) {
+                icon.classList.remove('bi-moon');
+                icon.classList.add('bi-sun');
+                text.textContent = 'Light Mode';
+            } else {
+                icon.classList.remove('bi-sun');
+                icon.classList.add('bi-moon');
+                text.textContent = 'Dark Mode';
+            }
+        });
+        
+        // Check for saved theme preference
+        document.addEventListener('DOMContentLoaded', function() {
+            if (localStorage.getItem('darkMode') === 'enabled') {
+                document.body.classList.add('dark-mode');
+                const toggleBtn = document.getElementById('darkModeToggle');
+                const icon = toggleBtn.querySelector('i');
+                const text = toggleBtn.querySelector('span');
+                icon.classList.remove('bi-moon');
+                icon.classList.add('bi-sun');
+                text.textContent = 'Light Mode';
+            }
+            
+            // Set up sorting
+            document.querySelectorAll('th.sortable').forEach(header => {
+                header.addEventListener('click', function() {
+                    const column = this.dataset.sort;
+                    const isDescending = this.querySelector('i').classList.contains('bi-arrow-down-short');
+                    
+                    // Reset all headers
+                    document.querySelectorAll('th.sortable i').forEach(icon => {
+                        icon.className = 'bi bi-arrow-down-short';
+                    });
+                    
+                    // Toggle direction for clicked header
+                    if (isDescending) {
+                        this.querySelector('i').className = 'bi bi-arrow-up-short';
+                        sortTable(column, false);
+                    } else {
+                        this.querySelector('i').className = 'bi bi-arrow-down-short';
+                        sortTable(column, true);
+                    }
+                });
+            });
+            
+            // Initialize tooltips
+            initializeEcoTooltips();
+        });
+        
         // Fetch ECO data for charts
         fetch('/api/eco_data')
             .then(response => response.json())
@@ -296,6 +364,65 @@
                 row.style.display = textContent.includes(searchText) ? '' : 'none';
             });
         });
+        
+        // Initialize ECO code tooltips
+        function initializeEcoTooltips() {
+            document.querySelectorAll('.eco-code').forEach(function(element) {
+                element.addEventListener('mouseover', function(e) {
+                    const ecoCode = this.textContent.trim();
+                    const description = getEcoDescription(ecoCode);
+                    
+                    // Create tooltip element
+                    const tooltip = document.createElement('div');
+                    tooltip.className = 'eco-tooltip';
+                    tooltip.textContent = description;
+                    tooltip.style.left = `${e.pageX + 10}px`;
+                    tooltip.style.top = `${e.pageY + 10}px`;
+                    
+                    document.body.appendChild(tooltip);
+                });
+                
+                element.addEventListener('mouseout', function() {
+                    const tooltips = document.querySelectorAll('.eco-tooltip');
+                    tooltips.forEach(t => t.remove());
+                });
+                
+                element.addEventListener('mousemove', function(e) {
+                    const tooltip = document.querySelector('.eco-tooltip');
+                    if (tooltip) {
+                        tooltip.style.left = `${e.pageX + 10}px`;
+                        tooltip.style.top = `${e.pageY + 10}px`;
+                    }
+                });
+            });
+        }
+        
+        // Function to sort the table
+        function sortTable(column, descending = false) {
+            const tbody = document.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            // Sort rows
+            rows.sort((a, b) => {
+                let aValue, bValue;
+                
+                if (column === 'eco') {
+                    aValue = a.querySelector('.eco-code').textContent.trim();
+                    bValue = b.querySelector('.eco-code').textContent.trim();
+                } else if (column === 'total') {
+                    aValue = parseInt(a.cells[7].textContent);
+                    bValue = parseInt(b.cells[7].textContent);
+                }
+                
+                // Compare values
+                if (aValue < bValue) return descending ? 1 : -1;
+                if (aValue > bValue) return descending ? -1 : 1;
+                return 0;
+            });
+            
+            // Reattach sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+        }
     </script>
 </body>
 </html>

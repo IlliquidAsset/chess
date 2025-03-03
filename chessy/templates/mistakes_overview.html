@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chessy - Mistakes Overview</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <span class="chessy-logo">♟️ Chessy</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/games">Games</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/openings">Openings</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/mistakes">Mistakes</a>
+                    </li>
+                </ul>
+                <div class="navbar-nav ms-auto">
+                    <button id="darkModeToggle" class="btn btn-outline-light btn-sm">
+                        <i class="bi bi-moon"></i> <span>Dark Mode</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <h1>Mistakes Overview</h1>
+        <p class="lead">Comprehensive analysis of mistakes in your chess games</p>
+        
+        {% if not analysis_data %}
+            <div class="alert alert-warning">
+                <h4 class="alert-heading">No Analysis Available</h4>
+                <p>No mistake analysis data is available yet. Go to the Dashboard and click "Analyze Games" to generate metrics.</p>
+            </div>
+        {% else %}
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card stats-card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">Total Blunders</h5>
+                            <h2 class="display-4">{{ analysis_data.blunders }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stats-card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">Total Inaccuracies</h5>
+                            <h2 class="display-4">{{ analysis_data.inaccuracies }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stats-card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">Total Mistakes</h5>
+                            <h2 class="display-4">{{ analysis_data.total_mistakes }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Mistakes Distribution</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="mistakes_distribution_chart" class="chart-container"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Mistakes by Game Phase</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="mistakes_by_phase_chart" class="chart-container"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Mistakes by Time Control</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="mistakes_by_time_control_chart" class="chart-container"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Recent Games with Most Mistakes</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Opponent</th>
+                                    <th>Result</th>
+                                    <th>Blunders</th>
+                                    <th>Inaccuracies</th>
+                                    <th>Total</th>
+                                    <th>Opening (ECO)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for game in top_mistake_games %}
+                                <tr>
+                                    <td>{{ game.date }}</td>
+                                    <td>
+                                        {% if game.PlayedAs == "White" %}
+                                        vs. {{ game.black }}
+                                        {% else %}
+                                        vs. {{ game.white }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if game.Result == "1-0" and game.PlayedAs == "White" or game.Result == "0-1" and game.PlayedAs == "Black" %}
+                                        <span class="badge bg-success">Win</span>
+                                        {% elif game.Result == "1/2-1/2" %}
+                                        <span class="badge bg-secondary">Draw</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">Loss</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ game.blunders }}</td>
+                                    <td>{{ game.inaccuracies }}</td>
+                                    <td>{{ game.total_mistakes }}</td>
+                                    <td><span class="eco-code">{{ game.ECO }}</span></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Improvement Over Time</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="mistakes_trend_chart" class="chart-container"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Store template data in hidden divs for JavaScript to access -->
+            <div id="chart-data" 
+                 data-blunders="{{ analysis_data.blunders|default(0) }}"
+                 data-inaccuracies="{{ analysis_data.inaccuracies|default(0) }}"
+                 data-opening="{{ analysis_data.phase_stats.opening|default(0) }}"
+                 data-middlegame="{{ analysis_data.phase_stats.middlegame|default(0) }}"
+                 data-endgame="{{ analysis_data.phase_stats.endgame|default(0) }}"
+                 style="display:none;">
+            </div>
+            
+            <!-- Time Control Data -->
+            {% if analysis_data.time_control_stats %}
+            <div id="time-control-data" style="display:none;">
+                {% for tc, count in analysis_data.time_control_stats.items() %}
+                <div class="tc-item" data-label="{{ tc }}" data-count="{{ count }}"></div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            
+            <!-- Trend Data -->
+            {% if analysis_data.trend_data %}
+            <div id="trend-data" style="display:none;">
+                {% for date, avg in analysis_data.trend_data %}
+                <div class="trend-item" data-date="{{ date }}" data-avg="{{ avg }}"></div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/ECO_codes_library.js') }}"></script>
+    <script>
+        // Dark mode toggle functionality
+        document.getElementById('darkModeToggle').addEventListener('click', function() {
+            document.body.classList.toggle('dark-mode');
+            const isDarkMode = document.body.classList.contains('dark-mode');
+            localStorage.setItem('darkMode', isDarkMode ? 'enabled' : 'disabled');
+            
+            // Update icon and text
+            const icon = this.querySelector('i');
+            const text = this.querySelector('span');
+            if (isDarkMode) {
+                icon.classList.remove('bi-moon');
+                icon.classList.add('bi-sun');
+                text.textContent = 'Light Mode';
+            } else {
+                icon.classList.remove('bi-sun');
+                icon.classList.add('bi-moon');
+                text.textContent = 'Dark Mode';
+            }
+        });
+        
+        // Check for saved theme preference
+        document.addEventListener('DOMContentLoaded', function() {
+            if (localStorage.getItem('darkMode') === 'enabled') {
+                document.body.classList.add('dark-mode');
+                const toggleBtn = document.getElementById('darkModeToggle');
+                const icon = toggleBtn.querySelector('i');
+                const text = toggleBtn.querySelector('span');
+                icon.classList.remove('bi-moon');
+                icon.classList.add('bi-sun');
+                text.textContent = 'Light Mode';
+            }
+            
+            // Initialize charts if we have data
+            initializeCharts();
+            
+            // Initialize ECO tooltips
+            initializeEcoTooltips();
+        });
+        
+        // Initialize ECO code tooltips
+        function initializeEcoTooltips() {
+            document.querySelectorAll('.eco-code').forEach(function(element) {
+                element.addEventListener('mouseover', function(e) {
+                    const ecoCode = this.textContent.trim();
+                    const description = getEcoDescription(ecoCode);
+                    
+                    // Create tooltip element
+                    const tooltip = document.createElement('div');
+                    tooltip.className = 'eco-tooltip';
+                    tooltip.textContent = description;
+                    tooltip.style.left = `${e.pageX + 10}px`;
+                    tooltip.style.top = `${e.pageY + 10}px`;
+                    
+                    document.body.appendChild(tooltip);
+                });
+                
+                element.addEventListener('mouseout', function() {
+                    const tooltips = document.querySelectorAll('.eco-tooltip');
+                    tooltips.forEach(t => t.remove());
+                });
+                
+                element.addEventListener('mousemove', function(e) {
+                    const tooltip = document.querySelector('.eco-tooltip');
+                    if (tooltip) {
+                        tooltip.style.left = `${e.pageX + 10}px`;
+                        tooltip.style.top = `${e.pageY + 10}px`;
+                    }
+                });
+            });
+        }
+        
+        // Initialize all charts
+        function initializeCharts() {
+            // Check if we have chart data element
+            var chartDataElement = document.getElementById('chart-data');
+            if (!chartDataElement) return;
+            
+            // Extract data from data attributes
+            var chartData = {
+                blunders: parseInt(chartDataElement.dataset.blunders) || 0,
+                inaccuracies: parseInt(chartDataElement.dataset.inaccuracies) || 0,
+                opening: parseInt(chartDataElement.dataset.opening) || 0,
+                middlegame: parseInt(chartDataElement.dataset.middlegame) || 0,
+                endgame: parseInt(chartDataElement.dataset.endgame) || 0
+            };
+            
+            // Extract time control data
+            var timeControlLabels = [];
+            var timeControlValues = [];
+            var tcElements = document.querySelectorAll('#time-control-data .tc-item');
+            tcElements.forEach(function(el) {
+                timeControlLabels.push(el.dataset.label);
+                timeControlValues.push(parseInt(el.dataset.count) || 0);
+            });
+            
+            // Extract trend data
+            var trendDates = [];
+            var trendValues = [];
+            var trendElements = document.querySelectorAll('#trend-data .trend-item');
+            trendElements.forEach(function(el) {
+                trendDates.push(el.dataset.date);
+                trendValues.push(parseFloat(el.dataset.avg) || 0);
+            });
+            
+            // Create mistakes distribution chart
+            var distributionData = [{
+                values: [chartData.blunders, chartData.inaccuracies],
+                labels: ['Blunders', 'Inaccuracies'],
+                type: 'pie',
+                marker: {
+                    colors: ['rgba(220, 53, 69, 0.7)', 'rgba(255, 193, 7, 0.7)']
+                }
+            }];
+            
+            var distributionLayout = {
+                title: 'Distribution of Mistakes',
+                height: 400
+            };
+            
+            Plotly.newPlot('mistakes_distribution_chart', distributionData, distributionLayout);
+            
+            // Create phase chart
+            var phaseData = [{
+                x: ['Opening', 'Middlegame', 'Endgame'],
+                y: [chartData.opening, chartData.middlegame, chartData.endgame],
+                type: 'bar',
+                marker: {
+                    color: 'rgba(61, 133, 198, 0.7)'
+                }
+            }];
+            
+            var phaseLayout = {
+                title: 'Mistakes by Game Phase',
+                height: 400
+            };
+            
+            Plotly.newPlot('mistakes_by_phase_chart', phaseData, phaseLayout);
+            
+            // Create time control chart if we have data
+            if (timeControlLabels.length > 0) {
+                var timeControlData = [{
+                    x: timeControlLabels,
+                    y: timeControlValues,
+                    type: 'bar',
+                    marker: {
+                        color: 'rgba(40, 167, 69, 0.7)'
+                    }
+                }];
+                
+                var timeControlLayout = {
+                    title: 'Mistakes by Time Control',
+                    height: 400
+                };
+                
+                Plotly.newPlot('mistakes_by_time_control_chart', timeControlData, timeControlLayout);
+            }
+            
+            // Create trend chart if we have data
+            if (trendDates.length > 0) {
+                var trendData = [{
+                    x: trendDates,
+                    y: trendValues,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: {
+                        color: 'rgba(61, 133, 198, 0.8)',
+                        width: 3
+                    },
+                    marker: {
+                        size: 8
+                    }
+                }];
+                
+                var trendLayout = {
+                    title: 'Average Mistakes per Game Over Time',
+                    height: 400,
+                    xaxis: {
+                        title: 'Date'
+                    },
+                    yaxis: {
+                        title: 'Average Mistakes per Game'
+                    }
+                };
+                
+                Plotly.newPlot('mistakes_trend_chart', trendData, trendLayout);
+            }
+        }
+    </script>
+</body>
+</html>

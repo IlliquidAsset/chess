@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis Error - Chessy</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <span class="chessy-logo">♟️ Chessy</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/games">Games</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/openings">Openings</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-md-8 offset-md-2">
+                <div class="card">
+                    <div class="card-header bg-danger text-white">
+                        <h4 class="mb-0">Analysis Error</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center mb-4">
+                            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 4C7.58172 4 4 7.58172 4 12C4 16.4183 7.58172 20 12 20C16.4183 20 20 16.4183 20 12C20 7.58172 16.4183 4 12 4Z" stroke="#dc3545" stroke-width="2"/>
+                                <path d="M12 8V12" stroke="#dc3545" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M12 16V16.01" stroke="#dc3545" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </div>
+                        
+                        <h5>We encountered an error analyzing your chess games</h5>
+                        
+                        <div class="alert alert-warning mt-3">
+                            <p><strong>Possible reasons:</strong></p>
+                            <ul>
+                                <li>Stockfish engine not found or incorrectly configured</li>
+                                <li>Issues with PGN file parsing</li>
+                                <li>Memory limitations when processing large game collections</li>
+                                <li>Missing dependencies or library issues</li>
+                            </ul>
+                        </div>
+                        
+                        <h5 class="mt-4">Troubleshooting Steps:</h5>
+                        <ol>
+                            <li>Verify Stockfish is installed and the correct path is set in the .env file</li>
+                            <li>Check the log files for specific error details</li>
+                            <li>Try analyzing smaller batches of games</li>
+                            <li>Ensure all required Python packages are installed</li>
+                        </ol>
+                        
+                        <div class="mt-4">
+                            <a href="/" class="btn btn-primary me-2">Return to Dashboard</a>
+                            <a href="/analyze" class="btn btn-outline-primary">Try Again</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

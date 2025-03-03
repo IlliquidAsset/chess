@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chessy - Game List</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
@@ -27,7 +28,15 @@
                     <li class="nav-item">
                         <a class="nav-link" href="/openings">Openings</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/mistakes">Mistakes</a>
+                    </li>
                 </ul>
+                <div class="navbar-nav ms-auto">
+                    <button id="darkModeToggle" class="btn btn-outline-light btn-sm">
+                        <i class="bi bi-moon"></i> <span>Dark Mode</span>
+                    </button>
+                </div>
             </div>
         </div>
     </nav>
@@ -54,6 +63,71 @@
                 <p>No game data has been downloaded yet. Return to the <a href="/">Dashboard</a> to download your games.</p>
             </div>
         {% else %}
+            <!-- Filter and Sort Controls -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Filters</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="form-group mb-3">
+                                <label>Played As</label>
+                                <div class="form-check">
+                                    <input class="form-check-input filter-played-as" type="checkbox" value="White" id="filterWhite" checked>
+                                    <label class="form-check-label" for="filterWhite">White</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input filter-played-as" type="checkbox" value="Black" id="filterBlack" checked>
+                                    <label class="form-check-label" for="filterBlack">Black</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="form-group mb-3">
+                                <label>Result</label>
+                                <div class="form-check">
+                                    <input class="form-check-input filter-result" type="checkbox" value="win" id="filterWin" checked>
+                                    <label class="form-check-label" for="filterWin">Win</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input filter-result" type="checkbox" value="loss" id="filterLoss" checked>
+                                    <label class="form-check-label" for="filterLoss">Loss</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input filter-result" type="checkbox" value="draw" id="filterDraw" checked>
+                                    <label class="form-check-label" for="filterDraw">Draw</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="form-group mb-3">
+                                <label>Time Control</label>
+                                <select id="timeControlFilter" class="form-select" multiple>
+                                    <option value="all" selected>All</option>
+                                    <!-- Time controls will be populated by JavaScript -->
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="form-group mb-3">
+                                <label>Actions</label>
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-primary" id="applyFilters">Apply Filters</button>
+                                    <button class="btn btn-success" id="downloadGames">
+                                        <i class="bi bi-download"></i> Download
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Games Table -->
             <div class="card mb-4">
                 <div class="card-header">
                     <div class="d-flex justify-content-between align-items-center">
@@ -65,10 +139,10 @@
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover table-striped mb-0">
+                        <table class="table table-hover table-striped mb-0" id="gamesTable">
                             <thead>
                                 <tr>
-                                    <th>Date</th>
+                                    <th class="sortable" data-sort="date">Date <i class="bi bi-arrow-down-short"></i></th>
                                     <th>White</th>
                                     <th>Black</th>
                                     <th>Result</th>
@@ -79,7 +153,7 @@
                             </thead>
                             <tbody>
                                 {% for game in games %}
-                                <tr>
+                                <tr data-played-as="{{ game.PlayedAs }}" data-result="{{ game.Result }}" data-time-control="{{ game.TimeControl }}">
                                     <td>{{ game.date }}</td>
                                     <td>
                                         {% if game.PlayedAs == "White" %}
@@ -119,17 +193,339 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/ECO_codes_library.js') }}"></script>
     <script>
-        // Simple search functionality
-        document.getElementById('gameSearch').addEventListener('keyup', function() {
-            let searchText = this.value.toLowerCase();
-            let tableRows = document.querySelectorAll('tbody tr');
+        // Dark mode toggle functionality
+        document.getElementById('darkModeToggle').addEventListener('click', function() {
+            document.body.classList.toggle('dark-mode');
+            const isDarkMode = document.body.classList.contains('dark-mode');
+            localStorage.setItem('darkMode', isDarkMode ? 'enabled' : 'disabled');
             
-            tableRows.forEach(row => {
-                let textContent = row.textContent.toLowerCase();
-                row.style.display = textContent.includes(searchText) ? '' : 'none';
-            });
+            // Update icon and text
+            const icon = this.querySelector('i');
+            const text = this.querySelector('span');
+            if (isDarkMode) {
+                icon.classList.remove('bi-moon');
+                icon.classList.add('bi-sun');
+                text.textContent = 'Light Mode';
+            } else {
+                icon.classList.remove('bi-sun');
+                icon.classList.add('bi-moon');
+                text.textContent = 'Dark Mode';
+            }
         });
+        
+        // Check for saved theme preference
+        document.addEventListener('DOMContentLoaded', function() {
+            if (localStorage.getItem('darkMode') === 'enabled') {
+                document.body.classList.add('dark-mode');
+                const toggleBtn = document.getElementById('darkModeToggle');
+                const icon = toggleBtn.querySelector('i');
+                const text = toggleBtn.querySelector('span');
+                icon.classList.remove('bi-moon');
+                icon.classList.add('bi-sun');
+                text.textContent = 'Light Mode';
+            }
+            
+            // Initialize sorting and filtering
+            if (document.getElementById('gamesTable')) {
+                // Default sort - newest games first
+                sortTable('date', true);
+                
+                // Populate time control filter
+                populateTimeControlFilter();
+                
+                // Set up sort headers
+                document.querySelectorAll('th.sortable').forEach(header => {
+                    header.addEventListener('click', function() {
+                        const column = this.dataset.sort;
+                        const isDescending = this.querySelector('i').classList.contains('bi-arrow-down-short');
+                        
+                        // Reset all headers
+                        document.querySelectorAll('th.sortable i').forEach(icon => {
+                            icon.className = 'bi bi-arrow-down-short';
+                        });
+                        
+                        // Toggle direction for clicked header
+                        if (isDescending) {
+                            this.querySelector('i').className = 'bi bi-arrow-up-short';
+                            sortTable(column, false);
+                        } else {
+                            this.querySelector('i').className = 'bi bi-arrow-down-short';
+                            sortTable(column, true);
+                        }
+                    });
+                });
+                
+                // Apply filters button
+                document.getElementById('applyFilters').addEventListener('click', function() {
+                    applyFilters();
+                });
+                
+                // Download games button
+                document.getElementById('downloadGames').addEventListener('click', function() {
+                    downloadFilteredGames();
+                });
+            }
+            
+            // Search functionality
+            const searchInput = document.getElementById('gameSearch');
+            if (searchInput) {
+                searchInput.addEventListener('keyup', function() {
+                    let searchText = this.value.toLowerCase();
+                    
+                    document.querySelectorAll('#gamesTable tbody tr').forEach(row => {
+                        if (row.style.display !== 'none') {  // Only search visible rows
+                            let textContent = row.textContent.toLowerCase();
+                            row.style.display = textContent.includes(searchText) ? '' : 'none';
+                        }
+                    });
+                });
+            }
+            
+            // Initialize ECO tooltips
+            initializeEcoTooltips();
+        });
+        
+        // Initialize ECO code tooltips
+        function initializeEcoTooltips() {
+            document.querySelectorAll('.eco-code').forEach(function(element) {
+                element.addEventListener('mouseover', function(e) {
+                    const ecoCode = this.textContent.trim();
+                    const description = getEcoDescription(ecoCode);
+                    
+                    // Create tooltip element
+                    const tooltip = document.createElement('div');
+                    tooltip.className = 'eco-tooltip';
+                    tooltip.textContent = description;
+                    tooltip.style.left = `${e.pageX + 10}px`;
+                    tooltip.style.top = `${e.pageY + 10}px`;
+                    
+                    document.body.appendChild(tooltip);
+                });
+                
+                element.addEventListener('mouseout', function() {
+                    const tooltips = document.querySelectorAll('.eco-tooltip');
+                    tooltips.forEach(t => t.remove());
+                });
+                
+                element.addEventListener('mousemove', function(e) {
+                    const tooltip = document.querySelector('.eco-tooltip');
+                    if (tooltip) {
+                        tooltip.style.left = `${e.pageX + 10}px`;
+                        tooltip.style.top = `${e.pageY + 10}px`;
+                    }
+                });
+            });
+        }
+
+        // Function to sort the table
+        function sortTable(column, descending = false) {
+            const tbody = document.querySelector('#gamesTable tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            // Sort rows
+            rows.sort((a, b) => {
+                let aValue, bValue;
+                
+                if (column === 'date') {
+                    aValue = a.cells[0].textContent.trim();
+                    bValue = b.cells[0].textContent.trim();
+                    
+                    // Handle invalid dates
+                    if (aValue === '????-??-??' || !isValidDate(aValue)) aValue = '0000-00-00';
+                    if (bValue === '????-??-??' || !isValidDate(bValue)) bValue = '0000-00-00';
+                } else {
+                    aValue = a.cells[getColumnIndex(column)].textContent.trim();
+                    bValue = b.cells[getColumnIndex(column)].textContent.trim();
+                }
+                
+                // Compare values
+                if (aValue < bValue) return descending ? 1 : -1;
+                if (aValue > bValue) return descending ? -1 : 1;
+                return 0;
+            });
+            
+            // Reattach sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        // Function to get column index by name
+        function getColumnIndex(columnName) {
+            const headers = document.querySelectorAll('#gamesTable th');
+            for (let i = 0; i < headers.length; i++) {
+                if (headers[i].dataset.sort === columnName) {
+                    return i;
+                }
+            }
+            return 0;
+        }
+
+        // Function to validate date
+        function isValidDate(dateString) {
+            const regex = /^\d{4}-\d{2}-\d{2}$/;
+            return regex.test(dateString);
+        }
+
+        // Function to populate time control filter
+        function populateTimeControlFilter() {
+            const select = document.getElementById('timeControlFilter');
+            const timeControls = new Set();
+            
+            // Extract unique time controls
+            document.querySelectorAll('#gamesTable tbody tr').forEach(row => {
+                const tc = row.getAttribute('data-time-control');
+                if (tc) {
+                    // Categorize time controls
+                    let category;
+                    try {
+                        if (tc.includes('+')) {
+                            const baseTime = parseInt(tc.split('+')[0]);
+                            if (baseTime < 180) category = 'Bullet';
+                            else if (baseTime < 600) category = 'Blitz';
+                            else if (baseTime < 1800) category = 'Rapid';
+                            else category = 'Classical';
+                        } else {
+                            const baseTime = parseInt(tc);
+                            if (baseTime < 180) category = 'Bullet';
+                            else if (baseTime < 600) category = 'Blitz';
+                            else if (baseTime < 1800) category = 'Rapid';
+                            else category = 'Classical';
+                        }
+                    } catch (e) {
+                        category = tc;
+                    }
+                    
+                    timeControls.add(category);
+                }
+            });
+            
+            // Remove "all" option if it exists
+            const allOption = select.querySelector('option[value="all"]');
+            if (allOption) {
+                select.removeChild(allOption);
+            }
+            
+            // Add options to select
+            timeControls.forEach(tc => {
+                const option = document.createElement('option');
+                option.value = tc;
+                option.textContent = tc;
+                option.selected = true;
+                select.appendChild(option);
+            });
+        }
+
+        // Function to apply filters
+        function applyFilters() {
+            // Get selected filters
+            const playedAsWhite = document.getElementById('filterWhite').checked;
+            const playedAsBlack = document.getElementById('filterBlack').checked;
+            
+            const filterWin = document.getElementById('filterWin').checked;
+            const filterLoss = document.getElementById('filterLoss').checked;
+            const filterDraw = document.getElementById('filterDraw').checked;
+            
+            const timeControlSelect = document.getElementById('timeControlFilter');
+            const selectedTimeControls = Array.from(timeControlSelect.selectedOptions).map(opt => opt.value);
+            
+            // Apply filters to each row
+            document.querySelectorAll('#gamesTable tbody tr').forEach(row => {
+                const playedAs = row.getAttribute('data-played-as');
+                let result = row.getAttribute('data-result');
+                const timeControl = row.getAttribute('data-time-control');
+                
+                // Convert result code to category
+                let resultCategory;
+                if (result === '1-0' && playedAs === 'White' || result === '0-1' && playedAs === 'Black') {
+                    resultCategory = 'win';
+                } else if (result === '1/2-1/2') {
+                    resultCategory = 'draw';
+                } else {
+                    resultCategory = 'loss';
+                }
+                
+                // Apply filters
+                const passesPlayedAs = (playedAsWhite && playedAs === 'White') || (playedAsBlack && playedAs === 'Black');
+                const passesResult = (filterWin && resultCategory === 'win') || 
+                                   (filterLoss && resultCategory === 'loss') || 
+                                   (filterDraw && resultCategory === 'draw');
+                
+                // Time control filtering
+                let passesTimeControl = selectedTimeControls.length === 0; // If nothing selected, show all
+                
+                if (!passesTimeControl) {
+                    // Categorize time control
+                    let category;
+                    try {
+                        if (timeControl.includes('+')) {
+                            const baseTime = parseInt(timeControl.split('+')[0]);
+                            if (baseTime < 180) category = 'Bullet';
+                            else if (baseTime < 600) category = 'Blitz';
+                            else if (baseTime < 1800) category = 'Rapid';
+                            else category = 'Classical';
+                        } else {
+                            const baseTime = parseInt(timeControl);
+                            if (baseTime < 180) category = 'Bullet';
+                            else if (baseTime < 600) category = 'Blitz';
+                            else if (baseTime < 1800) category = 'Rapid';
+                            else category = 'Classical';
+                        }
+                    } catch (e) {
+                        category = timeControl;
+                    }
+                    
+                    passesTimeControl = selectedTimeControls.includes(category);
+                }
+                
+                // Show or hide row
+                row.style.display = (passesPlayedAs && passesResult && passesTimeControl) ? '' : 'none';
+            });
+        }
+
+        // Function to download filtered games
+        function downloadFilteredGames() {
+            // Collect visible rows data
+            const games = [];
+            document.querySelectorAll('#gamesTable tbody tr').forEach(row => {
+                if (row.style.display !== 'none') {
+                    const game = {
+                        date: row.cells[0].textContent.trim(),
+                        white: row.cells[1].textContent.trim(),
+                        black: row.cells[2].textContent.trim(),
+                        result: row.cells[3].textContent.trim(),
+                        eco: row.cells[4].textContent.trim(),
+                        timeControl: row.cells[5].textContent.trim(),
+                        moves: row.cells[6].textContent.trim()
+                    };
+                    games.push(game);
+                }
+            });
+            
+            // Generate CSV content
+            let csvContent = "data:text/csv;charset=utf-8,";
+            
+            // Header row
+            csvContent += "Date,White,Black,Result,ECO,TimeControl,Moves\n";
+            
+            // Data rows
+            games.forEach(game => {
+                csvContent += `${game.date},${game.white},${game.black},${game.result},${game.eco},${game.timeControl},${game.moves}\n`;
+            });
+            
+            // Create download link
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "chess_games.csv");
+            document.body.appendChild(link);
+            
+            // Trigger download
+            link.click();
+            
+            // Clean up
+            document.body.removeChild(link);
+        }
     </script>
 </body>
 </html>

@@ -1,16 +1,49 @@
-/**
- * ECO Codes Library
- * 
- * This library provides descriptions for Encyclopedia of Chess Openings (ECO) codes
- * to enhance the user experience in the Chessy application.
- * 
- * Usage:
- * 1. Include this file in your HTML
- * 2. Call getEcoDescription(ecoCode) to get a description for any ECO code
- */
+"""
+ECO Codes Library
 
-const ecoCodesLibrary = {
-    // A-series: Flank Openings
+This module provides descriptions for Encyclopedia of Chess Openings (ECO) codes
+to enhance the user experience in the Chessy application.
+"""
+
+################################################################################
+# I. FUNCTIONS FOR ACCESSING ECO CODES
+################################################################################
+
+def get_eco_description(eco_code):
+    """
+    Get a description for an ECO code
+    
+    Args:
+        eco_code (str): The ECO code to look up (e.g., "A45")
+    
+    Returns:
+        str: Description of the opening or "Unknown opening" if not found
+    """
+    if not eco_code:
+        return "Unknown opening"
+    
+    # Standardize input (uppercase and trim)
+    standard_code = eco_code.strip().upper()
+    
+    # Return the description if found, otherwise return unknown
+    return ECO_CODES_LIBRARY.get(standard_code, "Unknown opening")
+
+def get_eco_descriptions():
+    """
+    Get all ECO codes and their descriptions
+    
+    Returns:
+        dict: Dictionary mapping ECO codes to their descriptions
+    """
+    return ECO_CODES_LIBRARY.copy()
+
+################################################################################
+# II. ECO CODES DICTIONARY
+################################################################################
+
+# Dictionary of ECO codes with descriptions
+ECO_CODES_LIBRARY = {
+    # A-series: Flank Openings
     "A00": "Irregular Openings (including Polish Opening, Sokolsky Opening)",
     "A01": "Nimzovich-Larsen Attack",
     "A02": "Bird's Opening (1.f4)",
@@ -112,7 +145,7 @@ const ecoCodesLibrary = {
     "A98": "Dutch, Ilyin-Genevsky Variation with Qc2",
     "A99": "Dutch, Ilyin-Genevsky Variation with b3",
 
-    // B-series: Semi-Open Games (except French Defense)
+    # B-series: Semi-Open Games (except French Defense)
     "B00": "Uncommon King's Pawn Opening",
     "B01": "Scandinavian Defense",
     "B02": "Alekhine's Defense",
@@ -214,7 +247,7 @@ const ecoCodesLibrary = {
     "B98": "Sicilian, Najdorf, 7...Be7",
     "B99": "Sicilian, Najdorf, 7...Be7 Main Line",
 
-    // C-series: Open Games and Queen's Pawn Games
+    # C-series: Open Games and Queen's Pawn Games
     "C00": "French Defense",
     "C01": "French, Exchange Variation",
     "C02": "French, Advance Variation",
@@ -316,7 +349,7 @@ const ecoCodesLibrary = {
     "C98": "Ruy Lopez, Closed, Chigorin, 12...Nc6",
     "C99": "Ruy Lopez, Closed, Chigorin, 12...c5d4",
 
-    // D-series: Closed Games and Indian Defenses
+    # D-series: Closed Games and Indian Defenses
     "D00": "Queen's Pawn Game, Mason Variation",
     "D01": "Richter-Veresov Attack",
     "D02": "Queen's Pawn Game, 2.Nf3",
@@ -418,7 +451,7 @@ const ecoCodesLibrary = {
     "D98": "Grünfeld, Russian, Smyslov Variation",
     "D99": "Grünfeld Defense, Smyslov, Main Line",
 
-    // E-series: Indian Defenses
+    # E-series: Indian Defenses
     "E00": "Queen's Pawn Game, Non-standard replies",
     "E01": "Catalan Opening",
     "E02": "Catalan Opening, Open Defense",
@@ -519,56 +552,4 @@ const ecoCodesLibrary = {
     "E97": "King's Indian, Orthodox, Aronin-Taimanov Variation (Yugoslav Attack)",
     "E98": "King's Indian, Orthodox, Aronin-Taimanov, 9.Ne1",
     "E99": "King's Indian, Orthodox, Aronin-Taimanov, Main Line"
-};
-
-/**
- * Get a description for an ECO code
- * 
- * @param {string} ecoCode - The ECO code to look up (e.g., "A45")
- * @returns {string} - Description of the opening or "Unknown opening" if not found
- */
-function getEcoDescription(ecoCode) {
-    if (!ecoCode) return "Unknown opening";
-    
-    // Standardize input (uppercase and trim)
-    const standardCode = ecoCode.toString().trim().toUpperCase();
-    
-    // Return the description if found, otherwise return unknown
-    return ecoCodesLibrary[standardCode] || "Unknown opening";
-}
-
-/**
- * Initialize ECO code tooltips on a page
- * 
- * @param {string} selector - CSS selector for elements with ECO codes
- */
-function initializeEcoTooltips(selector = '.eco-code') {
-    document.querySelectorAll(selector).forEach(element => {
-        const ecoCode = element.textContent.trim();
-        const description = getEcoDescription(ecoCode);
-        
-        // Set tooltip attributes
-        element.setAttribute('title', description);
-        element.setAttribute('data-bs-toggle', 'tooltip');
-        element.setAttribute('data-bs-placement', 'top');
-        
-        // Add hover effect class
-        element.classList.add('eco-code-tooltip');
-    });
-    
-    // Initialize Bootstrap tooltips
-    if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
-        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-    }
-}
-
-// Export functions if in a module environment
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        getEcoDescription,
-        initializeEcoTooltips
-    };
 }

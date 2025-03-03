@@ -1,0 +1,139 @@
+2025-03-03 04:05:47,195 - root - INFO - Logging initialized. Log file: output/chessy_20250303_040547.log
+2025-03-03 04:05:47,196 - root - INFO - ✅ Services initialized for user: IlliquidAsset
+2025-03-03 04:05:47,202 - root - INFO - 🚀 Starting Chessy server for user: IlliquidAsset
+2025-03-03 04:05:47,209 - werkzeug - WARNING -  * Debugger is active!
+2025-03-03 04:05:47,222 - werkzeug - INFO -  * Debugger PIN: 103-059-878
+2025-03-03 04:06:09,173 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:06:09] "GET / HTTP/1.1" 200 -
+2025-03-03 04:06:09,530 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:06:09] "GET /static/css/styles.css HTTP/1.1" 200 -
+2025-03-03 04:06:09,531 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:06:09] "[36mGET /static/js/charts.js HTTP/1.1[0m" 304 -
+2025-03-03 04:06:09,599 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:06:09] "GET /api/game_data HTTP/1.1" 200 -
+2025-03-03 04:06:09,771 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:06:09] "GET /api/charts/win_rate HTTP/1.1" 200 -
+2025-03-03 04:07:07,514 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:07:07] "GET /games HTTP/1.1" 200 -
+2025-03-03 04:07:07,819 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:07:07] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2025-03-03 04:11:29,512 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:11:29] "GET /openings HTTP/1.1" 200 -
+2025-03-03 04:11:33,096 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:11:33] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2025-03-03 04:11:33,294 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:11:33] "GET /api/eco_data HTTP/1.1" 200 -
+2025-03-03 04:12:24,093 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:24] "GET / HTTP/1.1" 200 -
+2025-03-03 04:12:24,478 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:24] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2025-03-03 04:12:24,479 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:24] "[36mGET /static/js/charts.js HTTP/1.1[0m" 304 -
+2025-03-03 04:12:24,552 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:24] "GET /api/charts/win_rate HTTP/1.1" 200 -
+2025-03-03 04:12:24,724 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:24] "GET /api/game_data HTTP/1.1" 200 -
+2025-03-03 04:12:35,029 - chessy.services - INFO - 🔍 Checking for new games for IlliquidAsset...
+2025-03-03 04:12:35,029 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:35] "POST /download HTTP/1.1" 200 -
+2025-03-03 04:12:35,030 - chessy.services.downloader - INFO - 🔍 Checking for new games for IlliquidAsset...
+2025-03-03 04:12:35,115 - chessy.services.downloader - INFO - 📚 Found 13 archives for IlliquidAsset
+2025-03-03 04:12:35,117 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2022/06
+2025-03-03 04:12:35,117 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/04
+2025-03-03 04:12:35,118 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/05
+2025-03-03 04:12:35,119 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/09
+2025-03-03 04:12:35,118 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/07
+2025-03-03 04:12:35,118 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/08
+2025-03-03 04:12:35,118 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/06
+2025-03-03 04:12:35,119 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/10
+2025-03-03 04:12:35,119 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/12
+2025-03-03 04:12:35,119 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2025/01
+2025-03-03 04:12:35,119 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2025/02
+2025-03-03 04:12:35,120 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2025/03
+2025-03-03 04:12:35,119 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/11
+2025-03-03 04:12:35,121 - chessy.services.downloader - INFO - ℹ️ No new games found
+2025-03-03 04:12:37,088 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:37] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:12:37,180 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:37] "GET / HTTP/1.1" 200 -
+2025-03-03 04:12:37,276 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:37] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2025-03-03 04:12:37,278 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:37] "[36mGET /static/js/charts.js HTTP/1.1[0m" 304 -
+2025-03-03 04:12:37,452 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:37] "GET /api/charts/win_rate HTTP/1.1" 200 -
+2025-03-03 04:12:37,462 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:37] "GET /api/game_data HTTP/1.1" 200 -
+2025-03-03 04:12:41,673 - chessy.services - INFO - 🚀 Starting game processing pipeline
+2025-03-03 04:12:41,673 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:41] "POST /analyze HTTP/1.1" 200 -
+2025-03-03 04:12:41,673 - chessy.services - INFO - 📊 Parsing games from main archive: output/games/IlliquidAsset_GameArchive.pgn
+2025-03-03 04:12:43,734 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:43] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:12:45,735 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:45] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:12:47,737 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:47] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:12:49,746 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:49] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:12:51,736 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:51] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:12:53,758 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:53] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:12:55,741 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:55] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:12:56,368 - chessy.services.parser - INFO - 📊 Parsed 7781 games from output/games/IlliquidAsset_GameArchive.pgn
+2025-03-03 04:12:56,509 - chessy.services.parser - INFO - 💾 Saved 7781 parsed games to output/analysis/IlliquidAsset_games_parsed.json
+2025-03-03 04:12:56,514 - chessy.services - INFO - 🧠 Analyzing 7781 games...
+2025-03-03 04:12:57,746 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:57] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:12:59,750 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:12:59] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:01,749 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:01] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:03,749 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:03] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:05,753 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:05] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:07,766 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:07] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:09,749 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:09] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:11,752 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:11] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:13,760 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:13] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:15,754 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:15] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:17,758 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:17] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:19,758 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:19] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:21,759 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:21] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:23,839 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:23] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:25,757 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:25] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:27,765 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:27] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:29,757 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:29] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:31,753 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:31] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:33,761 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:33] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:35,763 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:35] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:13:37,757 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:13:37] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:15:09,346 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:15:09] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:16:41,483 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:16:41] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:18:14,520 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:18:14] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:19:48,518 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:19:48] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:21:20,504 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:21:20] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:22:53,686 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:22:53] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:24:25,637 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:24:25] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:25:58,673 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:25:58] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:27:30,838 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:27:30] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:29:03,944 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:29:03] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:30:35,998 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:30:35] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:32:09,130 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:32:09] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:33:41,202 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:33:41] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:35:14,171 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:35:14] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:36:08,767 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:36:08] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:37:07,896 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:37:07] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:38:21,408 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:38:21] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:38:24,371 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:38:24] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:38:27,256 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:38:27] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:38:29,948 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:38:29] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:38:31,963 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:38:31] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:38:33,838 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:38:33] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:38:38,102 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:38:38] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:38:41,000 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:38:41] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:38:43,998 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:38:43] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:38:46,995 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:38:46] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:38:48,996 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:38:48] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:38:51,006 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:38:51] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:03,313 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:03] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:05,989 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:05] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:09,005 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:09] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:12,003 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:12] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:15,201 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:15] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:17,990 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:17] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:20,365 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:20] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:22,379 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:22] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:25,019 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:25] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:27,993 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:27] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:30,992 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:30] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:34,013 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:34] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:36,989 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:36] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:40,003 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:40] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:42,995 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:42] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:45,994 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:45] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:48,998 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:48] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:51,237 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:51] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:39:53,249 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:39:53] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:40:07,701 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:40:07] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:40:09,686 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:40:09] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:40:11,991 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:40:11] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:40:15,004 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:40:15] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:40:17,993 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:40:17] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:40:20,986 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:40:20] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:40:23,998 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:40:23] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:40:27,014 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:40:27] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:40:29,991 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:40:29] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:40:32,987 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:40:32] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:40:36,005 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:40:36] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:40:39,017 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:40:39] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:40:42,013 - werkzeug - INFO - 127.0.0.1 - - [03/Mar/2025 04:40:42] "GET /api/progress HTTP/1.1" 200 -
+2025-03-03 04:40:43,720 - werkzeug - INFO -  * Detected change in '/workspaces/chess/chessy/server.py', reloading
