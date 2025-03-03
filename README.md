@@ -1,5 +1,7 @@
 # Chessy - Chess.com Game Analysis Tool
 
+<img src="chessy/static/img/chessy_logo.png" alt="Chessy Logo" width="200">
+
 A powerful Python application for downloading, analyzing, and visualizing your Chess.com games.
 
 ![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
