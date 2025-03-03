@@ -13,9 +13,7 @@ __pycache__/
 !/output/logs/
 
 # Exclude contents of subdirectories 
-/output/games/*
-/output/analysis/*
-/output/logs/*
+
 
 # Include placeholder files to maintain directory structure
 !/output/games/.gitkeep
