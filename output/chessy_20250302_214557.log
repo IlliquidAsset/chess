@@ -34,3 +34,6 @@
 2025-03-02 21:47:51,365 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 21:47:51] "[36mGET /openings?__debugger__=yes&cmd=resource&f=style.css HTTP/1.1[0m" 304 -
 2025-03-02 21:47:51,365 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 21:47:51] "[36mGET /openings?__debugger__=yes&cmd=resource&f=debugger.js HTTP/1.1[0m" 304 -
 2025-03-02 21:47:51,414 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 21:47:51] "[36mGET /openings?__debugger__=yes&cmd=resource&f=console.png&s=7KKsGl2IyOjdZARfwKn9 HTTP/1.1[0m" 304 -
+2025-03-02 21:54:26,714 - werkzeug - INFO -  * Detected change in '/workspaces/chess/chessy/services/analyzer.py', reloading
+2025-03-02 21:54:27,116 - werkzeug - INFO -  * Restarting with stat
+2025-03-02 21:54:31,107 - werkzeug - INFO -  * Restarting with stat

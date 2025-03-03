@@ -6,20 +6,20 @@ import os
 import sys
 from datetime import datetime
 
-def setup_logging(output_dir="output", log_level=logging.INFO):
+def setup_logging(logs_dir="output/logs", log_level=logging.INFO):
     """
     Configure logging to both file and console with appropriate formatting.
     
     Args:
-        output_dir: Directory to store log files
+        logs_dir: Directory to store log files
         log_level: Logging level (default: INFO)
     """
     # Create output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(logs_dir, exist_ok=True)
     
     # Generate log filename with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = os.path.join(output_dir, f"chessy_{timestamp}.log")
+    log_file = os.path.join(logs_dir, f"chessy_{timestamp}.log")
     
     # Configure root logger
     logger = logging.getLogger()

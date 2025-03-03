@@ -1,0 +1,6 @@
+2025-03-02 22:47:56,985 - root - INFO - Logging initialized. Log file: output/logs/chessy_20250302_224756.log
+2025-03-02 22:47:56,985 - root - INFO - ✅ Services initialized for user: IlliquidAsset
+2025-03-02 22:47:56,988 - root - INFO - 🚀 Starting Chessy server for user: IlliquidAsset
+2025-03-02 22:47:56,996 - werkzeug - WARNING -  * Debugger is active!
+2025-03-02 22:47:56,996 - werkzeug - INFO -  * Debugger PIN: 102-572-992
+2025-03-02 22:48:46,873 - werkzeug - INFO -  * Detected change in '/workspaces/chess/chessy/server.py', reloading

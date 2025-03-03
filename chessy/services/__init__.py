@@ -44,7 +44,7 @@ class ChessyService:
     
     def process_new_games(self):
         """
-        Process newly downloaded games through the full pipeline.
+        Process games through the full pipeline.
         
         Returns:
             dict: Processing results with metrics
@@ -57,31 +57,28 @@ class ChessyService:
             "openings_analyzed": 0
         }
         
-        # Step 1: Download new games
-        new_pgn_file = self.downloader.fetch_and_save_games()
-        if not new_pgn_file:
-            emoji_log(self.logger, logging.INFO, "No new games to process", "ℹ️")
+        # For analysis, use the full archive file, not just new games
+        main_archive = self.config.ARCHIVE_FILE
+        
+        if not os.path.exists(main_archive):
+            emoji_log(self.logger, logging.WARNING, "No game archive found. Please download games first.", "⚠️")
             return results
-        
-        # Count games (approximate)
-        with open(new_pgn_file, 'r') as f:
-            content = f.read()
-            results["new_games"] = content.count('[Event "')
-        
-        # Step 2: Parse games
-        emoji_log(self.logger, logging.INFO, "Parsing game data...", "📊")
-        games_data = self.parser.parse_games(new_pgn_file)
+            
+        # Step 1: Parse games from the main archive
+        emoji_log(self.logger, logging.INFO, f"Parsing games from main archive: {main_archive}", "📊")
+        games_data = self.parser.parse_games(main_archive)
         results["parsed_games"] = len(games_data)
         
-        # Step 3: Analyze games
-        emoji_log(self.logger, logging.INFO, "Analyzing games...", "🧠")
-        analysis_results = self.analyzer.analyze_games(games_data)
-        results["analyzed_games"] = len(analysis_results) if analysis_results else 0
-        
-        # Step 4: Generate ECO statistics
-        emoji_log(self.logger, logging.INFO, "Generating opening statistics...", "📈")
-        eco_stats = self.analyzer.generate_eco_statistics(games_data)
-        results["openings_analyzed"] = len(eco_stats) if eco_stats else 0
+        # Step 2: Analyze games
+        if games_data:
+            emoji_log(self.logger, logging.INFO, f"Analyzing {len(games_data)} games...", "🧠")
+            analysis_results = self.analyzer.analyze_games(games_data)
+            results["analyzed_games"] = len(analysis_results) if analysis_results else 0
+            
+            # Step 3: Generate ECO statistics
+            emoji_log(self.logger, logging.INFO, "Generating opening statistics...", "📈")
+            eco_stats = self.analyzer.generate_eco_statistics(games_data)
+            results["openings_analyzed"] = len(eco_stats) if eco_stats else 0
         
         emoji_log(self.logger, logging.INFO, "Game processing completed successfully", "✅")
         return results

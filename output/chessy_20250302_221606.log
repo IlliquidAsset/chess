@@ -1,0 +1,88 @@
+2025-03-02 22:16:06,001 - root - INFO - Logging initialized. Log file: output/chessy_20250302_221606.log
+2025-03-02 22:16:06,002 - root - INFO - ✅ Services initialized for user: IlliquidAsset
+2025-03-02 22:16:06,005 - root - INFO - 🚀 Starting Chessy server for user: IlliquidAsset
+2025-03-02 22:16:06,014 - werkzeug - WARNING -  * Debugger is active!
+2025-03-02 22:16:06,014 - werkzeug - INFO -  * Debugger PIN: 102-572-992
+2025-03-02 22:16:54,830 - root - WARNING - ⚠️ No game analysis found. Will run analysis on request.
+2025-03-02 22:16:54,848 - root - INFO - ✅ Created basic analysis file from parsed games.
+2025-03-02 22:16:54,862 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:16:54] "GET / HTTP/1.1" 200 -
+2025-03-02 22:16:55,160 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:16:55] "GET /static/css/styles.css HTTP/1.1" 200 -
+2025-03-02 22:16:55,272 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:16:55] "GET /static/js/charts.js HTTP/1.1" 200 -
+2025-03-02 22:16:55,463 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:16:55] "GET /static/css/styles.css HTTP/1.1" 200 -
+2025-03-02 22:16:55,670 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:16:55] "GET /static/js/charts.js HTTP/1.1" 200 -
+2025-03-02 22:16:55,733 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:16:55] "GET /api/game_data HTTP/1.1" 200 -
+2025-03-02 22:16:55,875 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:16:55] "GET /api/charts/win_rate HTTP/1.1" 200 -
+2025-03-02 22:17:07,813 - chessy.services - INFO - 🔍 Checking for new games for IlliquidAsset...
+2025-03-02 22:17:07,813 - chessy.services.downloader - INFO - 🔍 Checking for new games for IlliquidAsset...
+2025-03-02 22:17:07,900 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2022/06
+2025-03-02 22:17:07,900 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/04
+2025-03-02 22:17:07,901 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/05
+2025-03-02 22:17:07,901 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/06
+2025-03-02 22:17:07,901 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/07
+2025-03-02 22:17:07,901 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/08
+2025-03-02 22:17:07,901 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/09
+2025-03-02 22:17:07,901 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/10
+2025-03-02 22:17:07,901 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/11
+2025-03-02 22:17:07,901 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/12
+2025-03-02 22:17:08,979 - chessy.services.downloader - INFO - 📥 Downloaded PGNs from 2025/01
+2025-03-02 22:17:10,066 - chessy.services.downloader - INFO - 📥 Downloaded PGNs from 2025/02
+2025-03-02 22:17:11,144 - chessy.services.downloader - INFO - 📥 Downloaded PGNs from 2025/03
+2025-03-02 22:17:11,151 - chessy.services.downloader - INFO - ✅ Added 685 games to archive
+2025-03-02 22:17:11,151 - chessy.services.downloader - INFO - 📝 Updated last downloaded timestamp to 2025/03
+2025-03-02 22:17:11,153 - chessy.services - INFO - 🚀 Starting game processing pipeline
+2025-03-02 22:17:11,153 - chessy.services.downloader - INFO - 🔍 Checking for new games for IlliquidAsset...
+2025-03-02 22:17:11,242 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2022/06
+2025-03-02 22:17:11,242 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/04
+2025-03-02 22:17:11,242 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/05
+2025-03-02 22:17:11,243 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/06
+2025-03-02 22:17:11,243 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/07
+2025-03-02 22:17:11,243 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/08
+2025-03-02 22:17:11,244 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/09
+2025-03-02 22:17:11,244 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/10
+2025-03-02 22:17:11,244 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/11
+2025-03-02 22:17:11,245 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/12
+2025-03-02 22:17:11,245 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2025/01
+2025-03-02 22:17:11,245 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2025/02
+2025-03-02 22:17:11,245 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2025/03
+2025-03-02 22:17:11,246 - chessy.services.downloader - INFO - ℹ️ No new games found
+2025-03-02 22:17:11,246 - chessy.services - INFO - ℹ️ No new games to process
+2025-03-02 22:17:11,247 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:17:11] "[32mPOST /download HTTP/1.1[0m" 302 -
+2025-03-02 22:17:11,355 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:17:11] "GET / HTTP/1.1" 200 -
+2025-03-02 22:17:11,463 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:17:11] "[36mGET /static/js/charts.js HTTP/1.1[0m" 304 -
+2025-03-02 22:17:11,464 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:17:11] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2025-03-02 22:17:11,528 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:17:11] "GET /api/game_data HTTP/1.1" 200 -
+2025-03-02 22:17:11,530 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:17:11] "GET /api/charts/win_rate HTTP/1.1" 200 -
+2025-03-02 22:17:15,752 - chessy.services - INFO - 🚀 Starting game processing pipeline
+2025-03-02 22:17:15,753 - chessy.services.downloader - INFO - 🔍 Checking for new games for IlliquidAsset...
+2025-03-02 22:17:15,838 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2022/06
+2025-03-02 22:17:15,838 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/04
+2025-03-02 22:17:15,839 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/05
+2025-03-02 22:17:15,839 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/06
+2025-03-02 22:17:15,839 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/07
+2025-03-02 22:17:15,839 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/08
+2025-03-02 22:17:15,840 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/09
+2025-03-02 22:17:15,840 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/10
+2025-03-02 22:17:15,841 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/11
+2025-03-02 22:17:15,841 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2024/12
+2025-03-02 22:17:15,841 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2025/01
+2025-03-02 22:17:15,842 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2025/02
+2025-03-02 22:17:15,842 - chessy.services.downloader - INFO - ⏭️ Skipping already downloaded archive: 2025/03
+2025-03-02 22:17:15,842 - chessy.services.downloader - INFO - ℹ️ No new games found
+2025-03-02 22:17:15,843 - chessy.services - INFO - ℹ️ No new games to process
+2025-03-02 22:17:15,844 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:17:15] "[32mPOST /analyze HTTP/1.1[0m" 302 -
+2025-03-02 22:17:15,908 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:17:15] "GET / HTTP/1.1" 200 -
+2025-03-02 22:17:16,009 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:17:16] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2025-03-02 22:17:16,014 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:17:16] "[36mGET /static/js/charts.js HTTP/1.1[0m" 304 -
+2025-03-02 22:17:16,069 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:17:16] "GET /api/game_data HTTP/1.1" 200 -
+2025-03-02 22:17:16,080 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:17:16] "GET /api/charts/win_rate HTTP/1.1" 200 -
+2025-03-02 22:22:32,049 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:22:32] "GET /games HTTP/1.1" 200 -
+2025-03-02 22:22:32,419 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:22:32] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2025-03-02 22:22:33,791 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:22:33] "GET /openings HTTP/1.1" 200 -
+2025-03-02 22:22:34,203 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:22:34] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2025-03-02 22:22:34,490 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:22:34] "GET /api/eco_data HTTP/1.1" 200 -
+2025-03-02 22:22:43,912 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:22:43] "GET / HTTP/1.1" 200 -
+2025-03-02 22:22:44,019 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:22:44] "[36mGET /static/css/styles.css HTTP/1.1[0m" 304 -
+2025-03-02 22:22:44,020 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:22:44] "[36mGET /static/js/charts.js HTTP/1.1[0m" 304 -
+2025-03-02 22:22:44,090 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:22:44] "GET /api/game_data HTTP/1.1" 200 -
+2025-03-02 22:22:44,092 - werkzeug - INFO - 127.0.0.1 - - [02/Mar/2025 22:22:44] "GET /api/charts/win_rate HTTP/1.1" 200 -
+2025-03-02 22:27:51,185 - werkzeug - INFO -  * Detected change in '/workspaces/chess/chessy/services/__init__.py', reloading

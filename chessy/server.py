@@ -8,12 +8,28 @@ from flask import Flask, render_template, jsonify, request, redirect, url_for, f
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import csv
+import threading
+from queue import Queue
+import time
+import threading
+from queue import Queue
+import time
+from flask import current_app
+
+# Global variables for progress tracking
+progress_queue = Queue()
+current_operation = None
+operation_started = None
+flash_messages = []  # Store flash messages to apply in request context
+
 
 # Import chessy modules
 from chessy.config import (
     USERNAME, HEADERS, ARCHIVE_FILE, LAST_DOWNLOADED_FILE, 
     GAME_ANALYSIS_FILE, PARSED_GAMES_FILE, ECO_CSV_FILE, 
-    STOCKFISH_PATH, validate_config, OUTPUT_DIR, config
+    STOCKFISH_PATH, validate_config, OUTPUT_DIR, LOGS_DIR,
+    config
 )
 from chessy.services.downloader import ChessComDownloader
 from chessy.services.parser import GameParser
@@ -21,12 +37,16 @@ from chessy.services.analyzer import GameAnalyzer
 from chessy.services import ChessyService
 from chessy.utils.logging import setup_logging, emoji_log
 
+progress_queue = Queue()
+current_operation = None
+operation_started = None
+
 # Initialize app
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # For flash messages
 
 # Setup logging
-logger = setup_logging(OUTPUT_DIR)
+logger = setup_logging(LOGS_DIR)
 
 # Initialize services
 def init_services():
@@ -89,9 +109,32 @@ def ensure_required_files():
     if not os.path.exists(PARSED_GAMES_FILE):
         emoji_log(logger, logging.WARNING, "No parsed games file found. Will process on first request.", "⚠️")
         
+        # If we have archive but no parsed games, parse them now
+        if os.path.exists(ARCHIVE_FILE):
+            try:
+                chessy_service.parser.parse_games(ARCHIVE_FILE)
+                emoji_log(logger, logging.INFO, "Automatically parsed existing archive file.", "✅")
+            except Exception as e:
+                emoji_log(logger, logging.ERROR, f"Error parsing existing archive: {str(e)}", "❌")
+        
     # Check for game analysis
     if not os.path.exists(GAME_ANALYSIS_FILE):
         emoji_log(logger, logging.WARNING, "No game analysis found. Will run analysis on request.", "⚠️")
+        
+        # If we have parsed games but no analysis, create a basic analysis file
+        if os.path.exists(PARSED_GAMES_FILE):
+            try:
+                with open(PARSED_GAMES_FILE, 'r') as f:
+                    games_data = json.load(f)
+                
+                # Create a basic analysis file with the games data
+                # This ensures the dashboard can show game counts even without full analysis
+                with open(GAME_ANALYSIS_FILE, 'w') as f:
+                    json.dump(games_data, f, indent=4)
+                
+                emoji_log(logger, logging.INFO, "Created basic analysis file from parsed games.", "✅")
+            except Exception as e:
+                emoji_log(logger, logging.ERROR, f"Error creating basic analysis: {str(e)}", "❌")
         
     return True
 
@@ -101,8 +144,39 @@ def index():
     """Main dashboard page."""
     has_data = ensure_required_files()
     
-    # Get game statistics if available
-    stats = chessy_service.get_game_statistics() if chessy_service else {"total_games": 0}
+    # Get game statistics
+    stats = {"total_games": 0, "wins": 0, "losses": 0, "draws": 0}
+    
+    try:
+        # First try to get stats from the service
+        if chessy_service:
+            service_stats = chessy_service.get_game_statistics()
+            if service_stats and service_stats.get('total_games', 0) > 0:
+                stats = service_stats
+            else:
+                # If service stats are empty, try to calculate basic stats from files
+                if os.path.exists(PARSED_GAMES_FILE):
+                    with open(PARSED_GAMES_FILE, 'r') as f:
+                        games_data = json.load(f)
+                    
+                    total_games = len(games_data)
+                    wins = sum(1 for game in games_data 
+                            if (game.get("PlayedAs") == "White" and game.get("Result") == "1-0") or
+                                (game.get("PlayedAs") == "Black" and game.get("Result") == "0-1"))
+                    losses = sum(1 for game in games_data 
+                                if (game.get("PlayedAs") == "White" and game.get("Result") == "0-1") or
+                                (game.get("PlayedAs") == "Black" and game.get("Result") == "1-0"))
+                    draws = sum(1 for game in games_data if game.get("Result") == "1/2-1/2")
+                    
+                    stats = {
+                        "total_games": total_games,
+                        "wins": wins,
+                        "losses": losses,
+                        "draws": draws,
+                        "win_percentage": round(wins / total_games * 100, 1) if total_games > 0 else 0
+                    }
+    except Exception as e:
+        emoji_log(logger, logging.ERROR, f"Error getting statistics: {str(e)}", "❌")
     
     return render_template(
         "index.html", 
@@ -111,52 +185,120 @@ def index():
         stats=stats
     )
 
+@app.route("/api/progress")
+def get_progress():
+    """Return the current progress status."""
+    global current_operation, operation_started
+    
+    if current_operation is None:
+        return jsonify({
+            "active": False,
+            "message": "No operation in progress"
+        })
+    
+    # Get all messages from the queue without blocking
+    messages = []
+    try:
+        while True:
+            message = progress_queue.get_nowait()
+            messages.append(message)
+    except:
+        pass  # Queue is empty
+    
+    # Calculate elapsed time
+    elapsed = 0
+    if operation_started:
+        elapsed = int(time.time() - operation_started)
+    
+    return jsonify({
+        "active": True,
+        "operation": current_operation,
+        "elapsed_seconds": elapsed,
+        "messages": messages
+    })
+
 @app.route("/download", methods=["POST"])
 def download_games():
     """Download games from Chess.com."""
+    global current_operation, operation_started, progress_queue
+    
+    # Reset progress tracking
+    with progress_queue.mutex:
+        progress_queue.queue.clear()
+    current_operation = "download"
+    operation_started = time.time()
+    
     if not chessy_service:
         flash("Service not available. Check configuration and try again.", "error")
+        current_operation = None
         return redirect(url_for("index"))
-        
-    try:
-        # Trigger game download
-        new_games = chessy_service.check_for_updates()
-        
-        if new_games > 0:
-            flash(f"Downloaded {new_games} new games successfully!", "success")
+    
+    # Run the download in a background thread
+    def download_thread():
+        global current_operation
+        try:
+            progress_queue.put("Starting game download from Chess.com...")
+            new_games = chessy_service.check_for_updates()
             
-            # Process new games
-            results = chessy_service.process_new_games()
-            flash(f"Processed {results['analyzed_games']} games with {results['openings_analyzed']} openings.", "success")
-        else:
-            flash("No new games found on Chess.com", "info")
-            
-        return redirect(url_for("index"))
-        
-    except Exception as e:
-        emoji_log(logger, logging.ERROR, f"Download error: {str(e)}", "❌")
-        flash(f"Error downloading games: {str(e)}", "error")
-        return redirect(url_for("index"))
+            if new_games > 0:
+                progress_queue.put(f"Downloaded {new_games} new games")
+                
+                # Process new games
+                progress_queue.put("Processing downloaded games...")
+                results = chessy_service.process_new_games()
+                progress_queue.put(f"Processed {results['analyzed_games']} games with {results['openings_analyzed']} openings")
+                
+                flash(f"Downloaded {new_games} new games successfully!", "success")
+                flash(f"Processed {results['analyzed_games']} games with {results['openings_analyzed']} openings.", "success")
+            else:
+                progress_queue.put("No new games found on Chess.com")
+                flash("No new games found on Chess.com", "info")
+        except Exception as e:
+            emoji_log(logger, logging.ERROR, f"Download error: {str(e)}", "❌")
+            progress_queue.put(f"Error: {str(e)}")
+            flash(f"Error downloading games: {str(e)}", "error")
+        finally:
+            current_operation = None
+    
+    # Start the download thread
+    threading.Thread(target=download_thread).start()
+    
+    # Return success immediately - the thread will continue running
+    return jsonify({"status": "success", "message": "Download started"})
 
 @app.route("/analyze", methods=["POST"])
 def analyze_games():
     """Analyze games with Stockfish."""
+    global current_operation, operation_started, progress_queue
+    
+    # Reset progress tracking
+    with progress_queue.mutex:
+        progress_queue.queue.clear()
+    current_operation = "analyze"
+    operation_started = time.time()
+    
     if not chessy_service:
         flash("Service not available. Check configuration and try again.", "error")
+        current_operation = None
         return redirect(url_for("index"))
-        
-    try:
-        # Trigger full game processing pipeline
-        results = chessy_service.process_new_games()
-        
-        flash(f"Analysis complete! Processed {results['analyzed_games']} games.", "success")
-        return redirect(url_for("index"))
-        
-    except Exception as e:
-        emoji_log(logger, logging.ERROR, f"Analysis error: {str(e)}", "❌")
-        flash(f"Error analyzing games: {str(e)}", "error")
-        return redirect(url_for("index"))
-
+    
+    # Run the analysis in a background thread
+    def analyze_thread():
+        global current_operation
+        try:
+            progress_queue.put("Starting game analysis...")
+            
+            # Trigger full game processing pipeline
+            results = chessy_service.process_new_games()
+            
+            progress_queue.put(f"Analysis complete! Processed {results['analyzed_games']} games.")
+            flash(f"Analysis complete! Processed {results['analyzed_games']} games.", "success")
+        except Exception as e:
+            emoji_log(logger, logging.ERROR, f"Analysis error: {str(e)}", "❌")
+            progress_queue.put(f"Error: {str(e)}")
+            flash(f"Error analyzing games: {str(e)}", "error")
+        finally:
+            current_operation = None
 @app.route("/games")
 def games():
     """View game list and details."""
@@ -193,69 +335,126 @@ def openings():
     )
 
 # API endpoints for data
+# Updated API route handlers - replace these in chessy/server.py
+
 @app.route("/api/game_data")
 def get_game_data():
     """Return game data as JSON."""
     try:
-        with open(GAME_ANALYSIS_FILE, "r") as f:
-            return jsonify(json.load(f))
+        if os.path.exists(GAME_ANALYSIS_FILE):
+            with open(GAME_ANALYSIS_FILE, "r") as f:
+                return jsonify(json.load(f))
+        else:
+            # If analysis file doesn't exist, try to use parsed games file
+            if os.path.exists(PARSED_GAMES_FILE):
+                with open(PARSED_GAMES_FILE, "r") as f:
+                    return jsonify(json.load(f))
+            return jsonify([])  # Return empty list if no data available
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        emoji_log(logger, logging.ERROR, f"Error loading game data: {str(e)}", "❌")
+        return jsonify([]), 500
 
 @app.route("/api/eco_data")
 def get_eco_data():
     """Return ECO performance data as JSON."""
     try:
-        with open(ECO_CSV_FILE, "r") as f:
-            reader = csv.DictReader(f)
-            return jsonify(list(reader))
+        if os.path.exists(ECO_CSV_FILE):
+            with open(ECO_CSV_FILE, "r") as f:
+                reader = csv.DictReader(f)
+                return jsonify(list(reader))
+        else:
+            return jsonify([])  # Return empty list if no data available
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        emoji_log(logger, logging.ERROR, f"Error loading ECO data: {str(e)}", "❌")
+        return jsonify([]), 500
 
 @app.route("/api/charts/win_rate")
 def win_rate_chart():
     """Generate win rate chart data."""
     try:
-        with open(GAME_ANALYSIS_FILE, "r") as f:
-            data = json.load(f)
+        # First try to use the game analysis file
+        if os.path.exists(GAME_ANALYSIS_FILE):
+            with open(GAME_ANALYSIS_FILE, "r") as f:
+                data = json.load(f)
+        # If that fails, try the parsed games file
+        elif os.path.exists(PARSED_GAMES_FILE):
+            with open(PARSED_GAMES_FILE, "r") as f:
+                data = json.load(f)
+        else:
+            # No data available
+            return jsonify([])
             
         if not data:
-            return jsonify({"error": "No data available"})
+            return jsonify([])
             
         df = pd.DataFrame(data)
         
-        # Prepare time control groups
-        df['TimeControl'] = df['TimeControl'].apply(lambda x: 
-            "Bullet" if int(x.split('+')[0]) < 3 else
-            "Blitz" if int(x.split('+')[0]) < 10 else
-            "Rapid" if int(x.split('+')[0]) < 30 else
-            "Classical"
-        )
+        # Handle case where TimeControl column might not exist
+        if 'TimeControl' not in df.columns:
+            return jsonify([
+                {
+                    'timeControl': 'All Games',
+                    'winRate': 0,
+                    'games': len(df) if not df.empty else 0
+                }
+            ])
         
-        # Calculate win rates by time control
-        tc_stats = df.groupby('TimeControl').apply(lambda x: {
-            'games': len(x),
-            'wins': sum((x['PlayedAs'] == 'White') & (x['Result'] == '1-0') | 
-                        (x['PlayedAs'] == 'Black') & (x['Result'] == '0-1')),
-            'losses': sum((x['PlayedAs'] == 'White') & (x['Result'] == '0-1') | 
-                          (x['PlayedAs'] == 'Black') & (x['Result'] == '1-0')),
-            'draws': sum(x['Result'] == '1/2-1/2')
-        }).to_dict()
+        # Prepare time control groups - handle potential errors in the time control format
+        try:
+            df['TimeControlGroup'] = df['TimeControl'].apply(lambda x: 
+                "Bullet" if x and isinstance(x, str) and int(x.split('+')[0]) < 3 else
+                "Blitz" if x and isinstance(x, str) and int(x.split('+')[0]) < 10 else
+                "Rapid" if x and isinstance(x, str) and int(x.split('+')[0]) < 30 else
+                "Classical"
+            )
+        except (ValueError, IndexError, AttributeError):
+            # If there's any error in parsing time controls, create a simpler grouping
+            df['TimeControlGroup'] = 'Unknown'
         
-        # Create chart data
+        # If PlayedAs is missing, use a default value
+        if 'PlayedAs' not in df.columns:
+            df['PlayedAs'] = 'Unknown'
+            
+        # Calculate win rates by time control, handle the case where we might not have all columns
         chart_data = []
-        for tc, stats in tc_stats.items():
-            win_rate = stats['wins'] / stats['games'] * 100 if stats['games'] > 0 else 0
-            chart_data.append({
-                'timeControl': tc,
-                'winRate': round(win_rate, 1),
-                'games': stats['games']
-            })
+        try:
+            # Group by time control
+            grouped = df.groupby('TimeControlGroup')
+            
+            for tc_group, group_df in grouped:
+                games = len(group_df)
+                wins = 0
+                if 'Result' in df.columns:
+                    wins = sum((group_df['PlayedAs'] == 'White') & (group_df['Result'] == '1-0') | 
+                              (group_df['PlayedAs'] == 'Black') & (group_df['Result'] == '0-1'))
+                
+                win_rate = (wins / games * 100) if games > 0 else 0
+                chart_data.append({
+                    'timeControl': tc_group,
+                    'winRate': round(win_rate, 1),
+                    'games': games
+                })
+                
+            # Sort by number of games
+            chart_data = sorted(chart_data, key=lambda x: x['games'], reverse=True)
+            
+        except Exception as e:
+            emoji_log(logger, logging.ERROR, f"Error calculating win rates: {str(e)}", "❌")
+            # Return a simple placeholder
+            return jsonify([
+                {
+                    'timeControl': 'All Games',
+                    'winRate': 0,
+                    'games': len(df) if not df.empty else 0
+                }
+            ])
             
         return jsonify(chart_data)
         
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        emoji_log(logger, logging.ERROR, f"Error generating win rate chart: {str(e)}", "❌")
+        return jsonify([]), 500
+        
 
 # Run the application
 def main():

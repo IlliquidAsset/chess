@@ -23,7 +23,7 @@ class ChessComDownloader:
         self.headers = headers
         self.archive_file = archive_file
         self.last_downloaded_file = last_downloaded_file
-        self.output_dir = os.path.dirname(archive_file)
+        self.output_dir = os.path.dirname(archive_file)  # This should now be games_dir
         os.makedirs(self.output_dir, exist_ok=True)
         self.logger = logging.getLogger(__name__)
         
@@ -53,16 +53,29 @@ class ChessComDownloader:
         """
         if os.path.exists(self.last_downloaded_file):
             with open(self.last_downloaded_file, "r") as f:
-                return f.read().strip()
+                content = f.read().strip()
+                if content:
+                    try:
+                        # Try to parse the timestamp
+                        return content
+                    except ValueError:
+                        emoji_log(self.logger, logging.WARNING, 
+                                 f"Invalid timestamp in last_downloaded.txt: {content}", "⚠️")
         return None
     
     def save_last_downloaded_datetime(self):
         """
-        Saves the most recent timestamp (YYYY.MM.DD-HH.MM.SS) to prevent duplicate downloads.
+        Saves the most recent timestamp to prevent duplicate downloads.
+        Uses current date as YYYY/MM format to match Chess.com's archive format.
         """
-        timestamp = datetime.now().strftime("%Y.%m.%d-%H.%M.%S")
+        current_date = datetime.now()
+        timestamp = f"{current_date.year}/{current_date.month:02d}"
+        
         with open(self.last_downloaded_file, "w") as f:
             f.write(timestamp)
+        
+        emoji_log(self.logger, logging.INFO, 
+                 f"Updated last downloaded timestamp to {timestamp}", "📝")
     
     def fetch_and_save_games(self):
         """
@@ -76,16 +89,22 @@ class ChessComDownloader:
         """
         emoji_log(self.logger, logging.INFO, f"Checking for new games for {self.username}...", "🔍")
         
-        archives = self.fetch_archives()
+        archives = sorted(self.fetch_archives())  # Sort to process chronologically
         last_downloaded_date = self.get_last_downloaded_datetime()
         new_pgns = ""
+        from_date = None
         
         for archive_url in archives:
-            archive_date = archive_url.split("/")[-2] + "/" + archive_url.split("/")[-1]  # Extract YYYY/MM format
+            # Extract YYYY/MM format from URL
+            archive_date = archive_url.split("/")[-2] + "/" + archive_url.split("/")[-1]
             
             if last_downloaded_date and archive_date <= last_downloaded_date:
                 emoji_log(self.logger, logging.INFO, f"Skipping already downloaded archive: {archive_date}", "⏭️")
                 continue
+            
+            # Track the earliest date for naming the file
+            if from_date is None:
+                from_date = archive_date.replace("/", ".")
             
             try:
                 # Respect rate limits
@@ -116,10 +135,14 @@ class ChessComDownloader:
             emoji_log(self.logger, logging.INFO, "No new games found", "ℹ️")
             return None
         
-        # Save newly downloaded games to a separate file
-        date_str = datetime.now().strftime("%Y.%m.%d")
-        new_pgn_file = os.path.join(self.output_dir, f"{self.username}_GameArchive_{date_str}.pgn")
+        # Use proper date format for the new file
+        to_date = datetime.now().strftime("%Y.%m.%d")
+        if from_date is None:
+            from_date = to_date  # Fallback if from_date wasn't set
+            
+        new_pgn_file = os.path.join(self.output_dir, f"{self.username}_GameArchive_{from_date}-{to_date}.pgn")
         
+        # Save newly downloaded games to a separate file
         with open(new_pgn_file, "w") as recent_file:
             recent_file.write(new_pgns)
         

@@ -50,6 +50,18 @@ class GameAnalyzer:
         if not self.stockfish_path or not os.path.exists(self.stockfish_path):
             emoji_log(self.logger, logging.WARNING, 
                      "Stockfish not available. Skipping detailed move analysis.", "⚠️")
+            # Even without Stockfish, we still want to save basic game data
+            for game_info in games_data:
+                analysis_result = {
+                    **game_info,
+                    "blunders": 0,
+                    "inaccuracies": 0,
+                    "move_count": game_info.get("NumMoves", 0)
+                }
+                analysis_results.append(analysis_result)
+            
+            # Save basic analysis
+            self._save_analysis_results(analysis_results)
             return analysis_results
         
         try:
@@ -62,71 +74,119 @@ class GameAnalyzer:
                     # Get PGN text from source file
                     pgn_file = game_info.get("source_file")
                     if not pgn_file or not os.path.exists(pgn_file):
+                        # If we can't find the source file, still save basic info
+                        analysis_result = {
+                            **game_info,
+                            "blunders": 0,
+                            "inaccuracies": 0,
+                            "move_count": game_info.get("NumMoves", 0)
+                        }
+                        analysis_results.append(analysis_result)
                         continue
                     
-                    # Find this specific game in the file
-                    with open(pgn_file, "r") as f:
-                        pgn_text = f.read()
-                    
-                    pgn_io = io.StringIO(pgn_text)
-                    while True:
-                        game = chess.pgn.read_game(pgn_io)
-                        if game is None:
-                            break
-                            
-                        # Check if this is the right game by matching headers
-                        headers = game.headers
-                        if headers.get("Site") == game_info.get("site") and \
-                           headers.get("Date") == game_info.get("date") and \
-                           headers.get("White") == game_info.get("white") and \
-                           headers.get("Black") == game_info.get("black"):
-                            
-                            # This is our game - analyze it
-                            board = game.board()
-                            move_count = 0
-                            blunders = 0
-                            inaccuracies = 0
-                            
-                            for move in game.mainline_moves():
-                                move_count += 1
-                                board.push(move)
+                    try:
+                        # Find this specific game in the file
+                        with open(pgn_file, "r") as f:
+                            pgn_text = f.read()
+                        
+                        pgn_io = io.StringIO(pgn_text)
+                        game_found = False
+                        
+                        while True:
+                            game = chess.pgn.read_game(pgn_io)
+                            if game is None:
+                                break
                                 
-                                # Classify phase
-                                phase = (
-                                    "Opening" if move_count <= 10 else
-                                    "Middlegame" if move_count <= 30 else
-                                    "Endgame"
-                                )
+                            # Check if this is the right game by matching headers
+                            headers = game.headers
+                            if headers.get("Site") == game_info.get("site") and \
+                               headers.get("Date") == game_info.get("date") and \
+                               headers.get("White") == game_info.get("white") and \
+                               headers.get("Black") == game_info.get("black"):
                                 
-                                # Stockfish analysis
-                                info = engine.analyse(board, chess.engine.Limit(depth=18))
-                                score = info.get("score")
+                                game_found = True
+                                # This is our game - analyze it
+                                board = game.board()
+                                move_count = 0
+                                blunders = 0
+                                inaccuracies = 0
                                 
-                                # Ensure score exists and has a valid relative value
-                                if score and hasattr(score, "relative") and score.relative is not None:
-                                    score_change = abs(score.relative.score())
-                                else:
-                                    score_change = 0  # Default to 0 if no valid score available
+                                for move in game.mainline_moves():
+                                    move_count += 1
+                                    board.push(move)
                                     
-                                if score_change >= 300:
-                                    blunders += 1
-                                    error_counts[phase] += 1
-                                elif score_change >= 100:
-                                    inaccuracies += 1
+                                    # Classify phase
+                                    phase = (
+                                        "Opening" if move_count <= 10 else
+                                        "Middlegame" if move_count <= 30 else
+                                        "Endgame"
+                                    )
                                     
-                                # Track time-trouble blunders (last 5 moves)
-                                if move_count >= len(list(game.mainline_moves())) - 5 and score_change >= 300:
-                                    time_trouble_blunders += 1
-                            
-                            # Add analysis results to game info
+                                    try:
+                                        # Stockfish analysis with timeout protection
+                                        info = engine.analyse(board, chess.engine.Limit(depth=18, time=0.1))
+                                        score = info.get("score")
+                                        
+                                        # Safe score extraction with better error handling
+                                        score_change = 0
+                                        if score and hasattr(score, "relative"):
+                                            relative = score.relative
+                                            if relative is not None and hasattr(relative, "score"):
+                                                try:
+                                                    rel_score = relative.score()
+                                                    if rel_score is not None:
+                                                        score_change = abs(rel_score)
+                                                except (TypeError, ValueError):
+                                                    # If score() method fails, just continue with score_change=0
+                                                    pass
+                                        
+                                        if score_change >= 300:
+                                            blunders += 1
+                                            error_counts[phase] += 1
+                                        elif score_change >= 100:
+                                            inaccuracies += 1
+                                            
+                                        # Track time-trouble blunders (last 5 moves)
+                                        remaining_moves = max(0, len(list(game.mainline_moves())) - move_count)
+                                        if remaining_moves <= 5 and score_change >= 300:
+                                            time_trouble_blunders += 1
+                                    
+                                    except Exception as e:
+                                        # Log the error but continue analyzing the game
+                                        self.logger.warning(f"Error analyzing move {move_count}: {str(e)}")
+                                        continue
+                                
+                                # Add analysis results to game info
+                                analysis_result = {
+                                    **game_info,
+                                    "blunders": blunders,
+                                    "inaccuracies": inaccuracies,
+                                    "move_count": move_count
+                                }
+                                analysis_results.append(analysis_result)
+                                break  # Found and analyzed the game, move to next
+                        
+                        if not game_found:
+                            # If we can't find the game in the PGN, still save basic info
                             analysis_result = {
                                 **game_info,
-                                "blunders": blunders,
-                                "inaccuracies": inaccuracies,
-                                "move_count": move_count
+                                "blunders": 0,
+                                "inaccuracies": 0,
+                                "move_count": game_info.get("NumMoves", 0)
                             }
                             analysis_results.append(analysis_result)
-                            break  # Found and analyzed the game, move to next
+                    
+                    except Exception as e:
+                        # Log the error but continue with the next game
+                        self.logger.error(f"Error processing game {game_info.get('site')}: {str(e)}")
+                        # Still add this game to results with basic info
+                        analysis_result = {
+                            **game_info,
+                            "blunders": 0,
+                            "inaccuracies": 0,
+                            "move_count": game_info.get("NumMoves", 0)
+                        }
+                        analysis_results.append(analysis_result)
             
             # Save analysis
             self._save_analysis_results(analysis_results)
@@ -141,7 +201,20 @@ class GameAnalyzer:
         except Exception as e:
             emoji_log(self.logger, logging.ERROR, f"Analysis error: {str(e)}", "❌")
             self.logger.exception("Detailed exception:")
-            return []
+            
+            # Even if analysis fails, still save basic game data
+            for game_info in games_data:
+                analysis_result = {
+                    **game_info,
+                    "blunders": 0,
+                    "inaccuracies": 0,
+                    "move_count": game_info.get("NumMoves", 0)
+                }
+                analysis_results.append(analysis_result)
+            
+            # Save basic analysis
+            self._save_analysis_results(analysis_results)
+            return analysis_results
     
     def _save_analysis_results(self, analysis_results):
         """
@@ -284,7 +357,20 @@ class GameAnalyzer:
             with open(self.eco_csv_file, mode="r", newline="", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    eco_data.append(row)
+                    # Ensure each row has the required fields
+                    processed_row = {
+                        'ECO': row.get('ECO', ''),
+                        'White_Games': row.get('White_Games', '0'),
+                        'White_Wins': row.get('White_Wins', '0'),
+                        'White_Draws': row.get('White_Draws', '0'), 
+                        'White_Losses': row.get('White_Losses', '0'),
+                        'Black_Games': row.get('Black_Games', '0'),
+                        'Black_Wins': row.get('Black_Wins', '0'),
+                        'Black_Draws': row.get('Black_Draws', '0'),
+                        'Black_Losses': row.get('Black_Losses', '0'),
+                        'Total_Games': row.get('Total_Games', '0')
+                    }
+                    eco_data.append(processed_row)
             return eco_data
         except Exception as e:
             self.logger.error(f"Error reading ECO statistics: {str(e)}")
