@@ -232,3 +232,97 @@ body.dark-mode {
   border-color: #665600;
 }
 
+/* Dark Mode Styles */
+body.dark-mode {
+  background-color: #121212;
+  color: #e0e0e0;
+}
+
+.dark-mode .card {
+  background-color: #1e1e1e;
+  border-color: #333;
+}
+
+.dark-mode .card-header {
+  background-color: #252525;
+  border-color: #333;
+}
+
+.dark-mode .navbar {
+  background-color: #1a1a1a !important;
+}
+
+.dark-mode .table {
+  color: #e0e0e0;
+}
+
+.dark-mode .table th {
+  background-color: #252525;
+  border-color: #333;
+}
+
+.dark-mode .table td {
+  border-color: #333;
+}
+
+.dark-mode .table-hover tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.075);
+}
+
+.dark-mode .list-group-item {
+  background-color: #1e1e1e;
+  border-color: #333;
+  color: #e0e0e0;
+}
+
+.dark-mode .alert-warning {
+  background-color: #332b00;
+  color: #ffdc7a;
+  border-color: #665600;
+}
+
+.dark-mode .dropdown-menu {
+  background-color: #252525;
+  border-color: #333;
+}
+
+.dark-mode .dropdown-item {
+  color: #e0e0e0;
+}
+
+.dark-mode .dropdown-item:hover {
+  background-color: #333;
+  color: #fff;
+}
+
+.dark-mode .form-control,
+.dark-mode .form-select {
+  background-color: #252525;
+  border-color: #444;
+  color: #e0e0e0;
+}
+
+.dark-mode .btn-outline-light {
+  color: #e0e0e0;
+  border-color: #e0e0e0;
+}
+
+.dark-mode .footer {
+  background-color: #1a1a1a !important;
+}
+
+/* Fix for notification colors in dark mode */
+body.dark-mode .notification.success {
+  background-color: #1e4028;
+  color: #d4edda;
+}
+
+body.dark-mode .notification.error {
+  background-color: #3e1c23;
+  color: #f8d7da;
+}
+
+body.dark-mode .notification.info {
+  background-color: #1a3c42;
+  color: #d1ecf1;
+}

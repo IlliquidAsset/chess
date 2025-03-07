@@ -18,6 +18,7 @@ import io
 import chess
 import chess.pgn
 from flask import send_from_directory
+from chessy.utils import format_time_control, categorize_time_control
 
 # Third-party libraries
 from flask import Flask, render_template, jsonify, request, redirect, url_for, flash, session, send_from_directory
@@ -226,7 +227,7 @@ def ensure_stats_loaded():
 # IV. BACKGROUND TASKS
 ################################################################################
 def download_thread(app_context):
-    """Background thread for downloading games."""
+    """Background thread for downloading games with filtering and avoiding duplicates."""
     with app_context:
         try:
             background_tasks['download']['running'] = True
@@ -237,50 +238,156 @@ def download_thread(app_context):
             background_tasks['download']['current'] = 0
             background_tasks['download']['percentage'] = 0
             
-            # Trigger game download
-            background_tasks['download']['messages'].append("Checking for new games...")
-            new_games = chessy_service.check_for_updates()
+            # Get filter settings
+            filters = background_tasks['download'].get('filters', {})
+            date_range = filters.get('date_range', 'last7')
+            start_date = filters.get('start_date')
+            end_date = filters.get('end_date')
+            time_control = filters.get('time_control', 'all')
             
-            if new_games > 0:
-                background_tasks['download']['messages'].append(f"Found {new_games} new games")
-                background_tasks['download']['status'] = f"Downloaded {new_games} new games"
-                background_tasks['download']['result'] = new_games
-                
-                # If games were downloaded, parse them immediately to avoid empty JSON errors
-                background_tasks['download']['messages'].append("Parsing downloaded games...")
-                if os.path.exists(ARCHIVE_FILE):
-                    try:
-                        games_data = chessy_service.parser.parse_games(ARCHIVE_FILE)
-                        if games_data:
-                            background_tasks['download']['messages'].append(f"Successfully parsed {len(games_data)} games")
-                    except Exception as e:
-                        background_tasks['download']['messages'].append(f"Error parsing games: {str(e)}")
-                
-                # Push notification to user
-                background_tasks['download']['notification'] = {
-                    'type': 'success',
-                    'title': 'Download Complete',
-                    'message': f"Successfully downloaded {new_games} new games"
-                }
-            else:
-                background_tasks['download']['messages'].append("No new games found")
-                background_tasks['download']['status'] = "No new games found"
-                background_tasks['download']['result'] = 0
-                
-                # Push notification to user
+            # Log filter settings with user-friendly message
+            filter_msg = f"Filters - Date: {date_range}"
+            if date_range == 'custom' and start_date and end_date:
+                filter_msg += f" ({start_date} to {end_date})"
+            if time_control != 'all':
+                filter_msg += f", Time Control: {time_control}"
+            
+            add_background_task_message('download', filter_msg)
+            
+            # STEP 1: Check if we already have games matching the filter criteria
+            has_matching_games = False
+            filtered_game_count = 0
+            
+            if os.path.exists(PARSED_GAMES_FILE):
+                try:
+                    with open(PARSED_GAMES_FILE, "r") as f:
+                        games_data = json.load(f)
+                    
+                    # Filter games by date
+                    filtered_games = games_data
+                    if start_date and end_date:
+                        filtered_games = [g for g in filtered_games if g.get('date', '') >= start_date and 
+                                        g.get('date', '') <= end_date]
+                    
+                    # Filter by time control if needed
+                    if time_control != 'all':
+                        temp_filtered = []
+                        for game in filtered_games:
+                            tc = game.get('TimeControl', '')
+                            if tc:
+                                game_category = categorize_time_control(tc)
+                                if game_category == time_control:
+                                    temp_filtered.append(game)
+                        filtered_games = temp_filtered
+                    
+                    filtered_game_count = len(filtered_games)
+                    
+                    # If we have games that match the filter
+                    if filtered_game_count > 0:
+                        has_matching_games = True
+                        add_background_task_message(
+                            'download', 
+                            f"Found {filtered_game_count} existing games matching your filters",
+                            "success"
+                        )
+                except Exception as e:
+                    logger.error(f"Error checking existing games: {str(e)}")
+            
+            # STEP 2: Download new games if needed
+            if has_matching_games:
+                # Ask user if they want to fetch more games
+                background_tasks['download']['messages'].append(
+                    f"Using {filtered_game_count} games from local database"
+                )
+                background_tasks['download']['status'] = "Using local games"
+                background_tasks['download']['result'] = filtered_game_count
                 background_tasks['download']['notification'] = {
                     'type': 'info',
-                    'title': 'Download Complete',
-                    'message': "No new games found"
+                    'title': 'Games Ready',
+                    'message': f"{filtered_game_count} games match your filter criteria"
                 }
+            else:
+                # Configure downloader with filters
+                downloader_filters = {}
                 
+                # Parse date range into actual dates
+                if start_date and end_date:
+                    downloader_filters['start_date'] = start_date
+                    downloader_filters['end_date'] = end_date
+                else:
+                    # Calculate date range based on selection
+                    today = datetime.now().date()
+                    if date_range == 'yesterday':
+                        yesterday = today - timedelta(days=1)
+                        downloader_filters['start_date'] = yesterday.isoformat()
+                        downloader_filters['end_date'] = yesterday.isoformat()
+                    elif date_range == 'last7':
+                        downloader_filters['start_date'] = (today - timedelta(days=7)).isoformat()
+                        downloader_filters['end_date'] = today.isoformat()
+                    elif date_range == 'last30':
+                        downloader_filters['start_date'] = (today - timedelta(days=30)).isoformat()
+                        downloader_filters['end_date'] = today.isoformat()
+                    elif date_range == 'thisMonth':
+                        start_of_month = today.replace(day=1)
+                        downloader_filters['start_date'] = start_of_month.isoformat()
+                        downloader_filters['end_date'] = today.isoformat()
+                    elif date_range == 'lastMonth':
+                        last_month = today.replace(day=1) - timedelta(days=1)
+                        start_of_last_month = last_month.replace(day=1)
+                        downloader_filters['start_date'] = start_of_last_month.isoformat()
+                        downloader_filters['end_date'] = last_month.isoformat()
+                
+                # Add time control filter
+                if time_control != 'all':
+                    downloader_filters['time_control'] = time_control
+                
+                # Trigger game download with filters
+                add_background_task_message('download', "Checking Chess.com for new games...")
+                new_games = chessy_service.check_for_updates(filters=downloader_filters)
+                
+                if new_games > 0:
+                    add_background_task_message(
+                        'download', 
+                        f"Found {new_games} new games from Chess.com",
+                        "success"
+                    )
+                    background_tasks['download']['status'] = f"Downloaded {new_games} new games"
+                    background_tasks['download']['result'] = new_games
+                    
+                    # If games were downloaded, parse them immediately to avoid empty JSON errors
+                    add_background_task_message('download', "Parsing downloaded games...")
+                    if os.path.exists(ARCHIVE_FILE):
+                        try:
+                            games_data = chessy_service.parser.parse_games(ARCHIVE_FILE)
+                            if games_data:
+                                add_background_task_message(
+                                    'download', 
+                                    f"Successfully parsed {len(games_data)} games",
+                                    "success"
+                                )
+                        except Exception as e:
+                            add_background_task_message(
+                                'download', 
+                                f"Error parsing games: {str(e)}",
+                                "error"
+                            )
+                else:
+                    add_background_task_message(
+                        'download', 
+                        "No new games found on Chess.com matching your criteria",
+                        "info"
+                    )
+                    background_tasks['download']['status'] = "No new games found"
+                    background_tasks['download']['result'] = 0
+            
+            # Complete the task
             background_tasks['download']['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             end_time = datetime.now()
             background_tasks['download']['elapsed_seconds'] = (end_time - background_tasks['download']['start_time']).total_seconds()
                 
         except Exception as e:
             error_msg = f"Download error: {str(e)}"
-            emoji_log(logger, logging.ERROR, error_msg, "❌")
+            logger.error(error_msg)
             background_tasks['download']['status'] = f"Error: {str(e)}"
             background_tasks['download']['messages'].append(error_msg)
             
@@ -1459,32 +1566,25 @@ def export_games():
         emoji_log(logger, logging.ERROR, f"Error exporting games: {str(e)}", "❌")
         return jsonify({"error": str(e)}), 500
 
-@app.route("/download/export/<filename>")
-def download_export_file(filename):
-    """Serve an exported file for download."""
-    try:
-        export_dir = os.path.join(OUTPUT_DIR, "exports")
-        return send_from_directory(
-            export_dir, 
-            filename, 
-            as_attachment=True
-        )
-    except Exception as e:
-        emoji_log(logger, logging.ERROR, f"Error serving export file: {str(e)}", "❌")
-        flash("Error downloading file.", "error")
-        return redirect(url_for("games"))
 
 @app.route("/api/toggle_theme", methods=["POST"])
 def toggle_theme():
     """Toggle between light and dark mode."""
     current_theme = session.get("theme", "light")
     
-    if current_theme == "light":
-        session["theme"] = "dark"
+    # Toggle theme
+    if current_theme == "light" or not current_theme:
+        new_theme = "dark-mode"
     else:
-        session["theme"] = "light"
-        
-    return jsonify({"theme": session["theme"]})
+        new_theme = "light"
+    
+    # Save to session
+    session["theme"] = new_theme
+    
+    # Log for debugging
+    emoji_log(logger, logging.INFO, f"Theme toggled to: {new_theme}", "🎨")
+    
+    return jsonify({"theme": new_theme})
 
 @app.route("/api/notifications")
 def get_notifications():
@@ -1578,8 +1678,9 @@ def clear_history():
                 try:
                     os.remove(file_path)
                     cleared_files.append(os.path.basename(file_path))
+                    logger.info(f"Deleted file: {file_path}")
                 except Exception as e:
-                    emoji_log(logger, logging.ERROR, f"Error deleting {file_path}: {str(e)}", "❌")
+                    logger.error(f"Error deleting {file_path}: {str(e)}")
         
         # Create empty files to prevent errors
         for file_path in [PARSED_GAMES_FILE, GAME_ANALYSIS_FILE]:
@@ -1587,10 +1688,20 @@ def clear_history():
                 os.makedirs(os.path.dirname(file_path), exist_ok=True)
                 with open(file_path, "w") as f:
                     f.write(json.dumps([]))
+                logger.info(f"Created empty file: {file_path}")
             except Exception as e:
-                emoji_log(logger, logging.ERROR, f"Error creating empty file {file_path}: {str(e)}", "❌")
+                logger.error(f"Error creating empty file {file_path}: {str(e)}")
         
-        emoji_log(logger, logging.INFO, f"Cleared game history: {', '.join(cleared_files)}", "🧹")
+        if cleared_files:
+            log_message = f"Cleared game history: {', '.join(cleared_files)}"
+            logger.info(f"🧹 {log_message}")
+            
+            # Show detailed message in Console for debugging
+            print(f"\n[CLEAR HISTORY] Cleared {len(cleared_files)} files: {', '.join(cleared_files)}\n")
+        else:
+            log_message = "No files found to clear"
+            logger.info(f"🧹 {log_message}")
+            print(f"\n[CLEAR HISTORY] No files found to clear\n")
         
         return jsonify({
             "status": "success",
@@ -1598,12 +1709,15 @@ def clear_history():
             "cleared_files": cleared_files
         })
     except Exception as e:
-        emoji_log(logger, logging.ERROR, f"Error clearing history: {str(e)}", "❌")
+        error_msg = f"Error clearing history: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        print(f"\n[CLEAR HISTORY ERROR] {error_msg}\n")
+        
         return jsonify({
             "status": "error",
-            "message": f"Error clearing history: {str(e)}"
+            "message": error_msg
         }), 500
-
+    
 @app.route("/api/export_raw_games", methods=["POST"])
 def export_raw_games():
     """Export raw game data in various formats."""
@@ -1793,7 +1907,7 @@ def export_raw_games():
         }), 500
 
 @app.route("/download/export/<filename>")
-def download_export_file(filename):
+def serve_export_file(filename):
     """Serve an exported file for download."""
     try:
         export_dir = os.path.join(OUTPUT_DIR, "exports")
@@ -1806,6 +1920,80 @@ def download_export_file(filename):
         emoji_log(logger, logging.ERROR, f"Error serving export file: {str(e)}", "❌")
         flash("Error downloading file.", "error")
         return redirect(url_for("games"))
+    
+################################################################################
+# VI. ENHANCED LOGGING
+################################################################################
+
+def log_with_ui_message(logger, level, message, emoji="", ui_message=None):
+    """
+    Log a message with optional emoji and UI message.
+    
+    Args:
+        logger: Logger instance
+        level: Logging level (e.g., logging.INFO)
+        message: Message for server logs
+        emoji: Optional emoji prefix
+        ui_message: Optional user-friendly message for UI display
+    
+    Returns:
+        str: The UI message if provided, otherwise the log message
+    """
+    # Log the server message with emoji if provided
+    if emoji:
+        message = f"{emoji} {message}"
+    
+    if level == logging.DEBUG:
+        logger.debug(message)
+    elif level == logging.INFO:
+        logger.info(message)
+    elif level == logging.WARNING:
+        logger.warning(message)
+    elif level == logging.ERROR:
+        logger.error(message)
+    elif level == logging.CRITICAL:
+        logger.critical(message)
+    
+    # Return the UI message for notification systems
+    return ui_message if ui_message else message
+
+def add_background_task_message(task_type, message, message_type="info"):
+    """
+    Add a message to a background task's message list and create a notification.
+    
+    Args:
+        task_type: Type of task ('download' or 'analyze')
+        message: Message to display
+        message_type: Type of message ('info', 'success', 'warning', 'error')
+    """
+    if task_type in background_tasks:
+        # Add to messages list
+        background_tasks[task_type]['messages'].append(message)
+        
+        # Create notification if needed
+        if message_type != "info":
+            background_tasks[task_type]['notification'] = {
+                'type': message_type,
+                'title': f"{task_type.title()} Update",
+                'message': message
+            }
+        
+        # Log message
+        log_level = {
+            "info": logging.INFO,
+            "success": logging.INFO,
+            "warning": logging.WARNING,
+            "error": logging.ERROR
+        }.get(message_type, logging.INFO)
+        
+        emoji = {
+            "info": "ℹ️",
+            "success": "✅",
+            "warning": "⚠️",
+            "error": "❌"
+        }.get(message_type, "")
+        
+        logger.log(log_level, f"{emoji} {message}")
 ################################################################################
 # VII. MAIN ENTRY POINT
 ################################################################################
