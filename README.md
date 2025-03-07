@@ -21,7 +21,7 @@ A powerful Python application for downloading, analyzing, and visualizing your C
 1. **Install**
    ```bash
    # Clone repository
-   git clone https://github.com/yourusername/chessy.git
+   git clone https://github.com/IlliquidAsset/chessy.git
    cd chessy
    
    # Install dependencies
