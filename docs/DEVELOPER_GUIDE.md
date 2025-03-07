@@ -68,7 +68,7 @@ Parses PGN files and extracts structured data:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/chessy.git
+   git clone https://github.com/IlliquidAsset/chessy.git
    cd chessy
    ```
 
