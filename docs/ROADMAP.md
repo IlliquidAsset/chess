@@ -4,7 +4,7 @@
 
 This roadmap outlines the development plan for Chessy, a chess analysis tool. The project is structured in phases, focusing on core functionality, user experience, and scalability. The initial priorities are stabilizing the existing features, implementing robust background processing, and improving the user interface. Later phases will introduce new features and performance optimizations.
 
-## Current Status (as of October 26, 2023 - *You should update this date*)
+## Current Status (as of March 2025)
 
 Several core features have been implemented, including:
 
