@@ -58,12 +58,12 @@ A powerful Python application for downloading, analyzing, and visualizing your C
 
 <table>
   <tr>
-    <td><img src="docs/img/dashboard.png" alt="Dashboard" width="100%"/></td>
-    <td><img src="docs/img/openings.png" alt="Opening Analysis" width="100%"/></td>
+    <td><img src="docs/img/dash.jpeg" alt="Dashboard" width="100%"/></td>
+    <td><img src="docs/img/dashdark.jpeg" alt="Dark Mode Dashboard" width="100%"/></td>
   </tr>
   <tr>
-    <td><img src="docs/img/games.png" alt="Game List" width="100%"/></td>
-    <td><img src="docs/img/mistakes.png" alt="Mistake Analysis" width="100%"/></td>
+    <td><img src="docs/img/games.jpeg" alt="Game List" width="100%"/></td>
+    <td><img src="docs/img/mistakes.jpeg" alt="Mistake Analysis" width="100%"/></td>
   </tr>
 </table>
 
