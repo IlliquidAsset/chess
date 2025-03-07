@@ -68,3 +68,94 @@ def emoji_log(logger, level, message, emoji=""):
         logger.error(message)
     elif level == logging.CRITICAL:
         logger.critical(message)
+
+        ################################################################################
+# IV. UTILITY FUNCTIONS
+################################################################################
+
+def format_time_control(seconds):
+    """
+    Format time control from seconds to minutes.
+    
+    Args:
+        seconds (str or int): Time control in seconds, possibly with increment (e.g. "300+2")
+        
+    Returns:
+        str: Formatted time control (e.g. "5min +2sec")
+    """
+    if not seconds:
+        return "Unknown"
+    
+    # Parse the time control
+    base_time = 0
+    increment = 0
+    
+    try:
+        if isinstance(seconds, str):
+            if '+' in seconds:
+                parts = seconds.split('+')
+                base_time = int(parts[0])
+                increment = int(parts[1])
+            else:
+                base_time = int(seconds)
+        else:
+            base_time = int(seconds)
+    except (ValueError, TypeError):
+        return str(seconds)  # Return original if parsing fails
+    
+    # Convert to minutes and seconds
+    minutes = base_time // 60
+    remaining_seconds = base_time % 60
+    
+    # Format the display
+    display = []
+    if minutes > 0:
+        display.append(f"{minutes}min")
+    
+    if remaining_seconds > 0 or minutes == 0:
+        display.append(f"{remaining_seconds}sec")
+    
+    result = " ".join(display)
+    
+    if increment > 0:
+        result += f" +{increment}sec"
+    
+    return result
+
+def categorize_time_control(seconds):
+    """
+    Categorize time control into standard categories.
+    
+    Args:
+        seconds (str or int): Time control in seconds
+        
+    Returns:
+        str: Category (bullet, blitz, rapid, classical)
+    """
+    # Parse the time control
+    base_time = 0
+    
+    try:
+        if isinstance(seconds, str):
+            if '+' in seconds:
+                parts = seconds.split('+')
+                base_time = int(parts[0])
+            else:
+                base_time = int(seconds)
+        else:
+            base_time = int(seconds)
+    except (ValueError, TypeError):
+        return "unknown"
+    
+    # Convert to minutes
+    minutes = base_time / 60
+    
+    # Categorize
+    if minutes < 3:
+        return "bullet"
+    elif minutes < 10:
+        return "blitz"
+    elif minutes < 30:
+        return "rapid"
+    else:
+        return "classical"

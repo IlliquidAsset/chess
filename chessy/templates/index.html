@@ -20,7 +20,7 @@
     </div>
 </div>
 
-<!-- Actions Section -->
+<!-- Actions Section with Filters -->
 <div class="row mb-4">
     <div class="col-md-12">
         <div class="card">
@@ -28,13 +28,63 @@
                 <h5 class="card-title mb-0">Actions</h5>
             </div>
             <div class="card-body">
-                <div class="d-flex gap-2 flex-wrap">
-                    <button id="downloadBtn" class="btn btn-primary">
-                        <i class="bi bi-download"></i> Download New Games
+                <!-- Filters Section -->
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="dateRange" class="form-label">Date Range</label>
+                        <select id="dateRange" class="form-select">
+                            <option value="yesterday">Yesterday</option>
+                            <option value="last7" selected>Last 7 days</option>
+                            <option value="last30">Last 30 days</option>
+                            <option value="thisMonth">This month</option>
+                            <option value="lastMonth">Last month</option>
+                            <option value="custom">Custom range</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 custom-date-range" style="display: none;">
+                        <label for="startDate" class="form-label">From</label>
+                        <input type="date" id="startDate" class="form-control">
+                    </div>
+                    <div class="col-md-4 custom-date-range" style="display: none;">
+                        <label for="endDate" class="form-label">To</label>
+                        <input type="date" id="endDate" class="form-control">
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="timeControl" class="form-label">Time Control</label>
+                        <select id="timeControl" class="form-select">
+                            <option value="all" selected>All time controls</option>
+                            <option value="bullet">Bullet (< 3 min)</option>
+                            <option value="blitz">Blitz (3-10 min)</option>
+                            <option value="rapid">Rapid (10-30 min)</option>
+                            <option value="classical">Classical (> 30 min)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="d-flex gap-2 flex-wrap mt-3">
+                    <button id="fetchBtn" class="btn btn-primary">
+                        <i class="bi bi-download"></i> Fetch Games
                     </button>
                     <button id="analyzeBtn" class="btn btn-success" {% if not has_data %}disabled{% endif %}>
                         <i class="bi bi-graph-up"></i> Analyze Games
                     </button>
+                    <button id="clearHistoryBtn" class="btn btn-warning">
+                        <i class="bi bi-trash"></i> Clear Games History
+                    </button>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-file-earmark-arrow-down"></i> Export Raw Games
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" id="exportExcel">Excel (.xlsx)</a></li>
+                            <li><a class="dropdown-item" href="#" id="exportCsv">CSV</a></li>
+                            <li><a class="dropdown-item" href="#" id="exportJson">JSON</a></li>
+                        </ul>
+                    </div>
                     <button id="advancedAnalysisBtn" class="btn btn-info" disabled>
                         <i class="bi bi-stars"></i> Advanced Analysis
                     </button>
@@ -325,3 +375,4 @@
     }
 </script>
 {% endblock %}
+<script src="{{ url_for('static', filename='js/download-filters.js') }}"></script>

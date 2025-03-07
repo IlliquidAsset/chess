@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 import concurrent.futures
 import threading
 from queue import Queue
+import re
 
 ################################################################################
 # I. CONSTANTS AND CONFIGURATION
@@ -27,7 +28,7 @@ RETRY_DELAY = 2
 thread_local = threading.local()
 
 ################################################################################
-# II. DOWNLOADER CLASS
+# II. DOWNLOADER CLASS UPDATE
 ################################################################################
 class ChessComDownloader:
     def __init__(self, username, headers, archive_file, last_downloaded_file):
@@ -50,165 +51,35 @@ class ChessComDownloader:
         
         # Queue for storing downloaded PGNs
         self.pgn_queue = Queue()
-        
-    def log(self, level, message, emoji=""):
-        """
-        Log a message with an optional emoji prefix.
-        """
-        if emoji:
-            message = f"{emoji} {message}"
-        
-        if level == logging.DEBUG:
-            self.logger.debug(message)
-        elif level == logging.INFO:
-            self.logger.info(message)
-        elif level == logging.WARNING:
-            self.logger.warning(message)
-        elif level == logging.ERROR:
-            self.logger.error(message)
-        elif level == logging.CRITICAL:
-            self.logger.critical(message)
     
-    ################################################################################
-    # III. ARCHIVE MANAGEMENT
-    ################################################################################
-    def fetch_archives(self):
-        """
-        Fetches available game archives from Chess.com.
-        Returns a list of archive URLs or an empty list if an error occurs.
-        """
-        url = f"https://api.chess.com/pub/player/{self.username}/games/archives"
-        
-        try:
-            # Create a dedicated session for this request
-            session = requests.Session()
-            response = session.get(url, headers=self.headers, timeout=DEFAULT_TIMEOUT)
-            response.raise_for_status()  # Raise exception for 4XX/5XX responses
-            
-            archives = response.json().get('archives', [])
-            self.log(logging.INFO, f"Found {len(archives)} archives for {self.username}", "📚")
-            return archives
-            
-        except requests.exceptions.RequestException as e:
-            self.log(logging.ERROR, f"Error fetching archives: {str(e)}", "❌")
-            return []
-        except requests.exceptions.JSONDecodeError:
-            self.log(logging.ERROR, "Invalid JSON response received", "❌")
-            return []
-        finally:
-            session.close()
-    
-    def get_last_downloaded_datetime(self):
-        """
-        Reads the last downloaded archive date from file.
-        If no file exists, returns None (fetches all archives).
-        """
-        if os.path.exists(self.last_downloaded_file):
-            with open(self.last_downloaded_file, "r") as f:
-                return f.read().strip()
-        return None
-    
-    def save_last_downloaded_datetime(self):
-        """
-        Saves the most recent timestamp (YYYY.MM.DD-HH.MM.SS) to prevent duplicate downloads.
-        """
-        timestamp = datetime.now().strftime("%Y.%m.%d-%H.%M.%S")
-        with open(self.last_downloaded_file, "w") as f:
-            f.write(timestamp)
-    
-    ################################################################################
-    # IV. NETWORK OPERATIONS
-    ################################################################################
-    def download_archive(self, archive_url, last_downloaded_date=None):
-        """
-        Downloads a single archive with retries and error handling.
-        Returns the PGN text or None if it couldn't be downloaded.
-        """
-        archive_date = archive_url.split("/")[-2] + "/" + archive_url.split("/")[-1]  # Extract YYYY/MM format
-        
-        if last_downloaded_date and archive_date <= last_downloaded_date:
-            self.log(logging.INFO, f"Skipping already downloaded archive: {archive_date}", "⏭️")
-            return None
-            
-        retry_count = 0
-        while retry_count < MAX_RETRIES:
-            try:
-                # Create a dedicated session for this request
-                session = requests.Session()
-                
-                response = session.get(f"{archive_url}/pgn", 
-                                       headers=self.headers, 
-                                       timeout=DEFAULT_TIMEOUT)
-                
-                if response.status_code == 200:
-                    self.log(logging.INFO, f"Downloaded PGNs from {archive_date}", "📥")
-                    return response.text
-                elif response.status_code == 429:
-                    wait_time = 60 * (retry_count + 1)  # Exponential backoff
-                    self.log(logging.WARNING, 
-                             f"Rate limit exceeded. Waiting {wait_time} seconds...", "⏱️")
-                    time.sleep(wait_time)
-                    retry_count += 1
-                else:
-                    self.log(logging.ERROR, 
-                             f"Failed to fetch PGNs: HTTP {response.status_code}", "❌")
-                    retry_count += 1
-                    time.sleep(RETRY_DELAY * (2 ** retry_count))  # Exponential backoff
-                    
-            except requests.exceptions.RequestException as e:
-                self.log(logging.ERROR, 
-                         f"Error downloading archive {archive_url}: {str(e)}", "❌")
-                retry_count += 1
-                time.sleep(RETRY_DELAY * (2 ** retry_count))  # Exponential backoff
-            finally:
-                session.close()
-        
-        # If we've exhausted all retries
-        self.log(logging.ERROR, 
-                 f"Failed to download archive after {MAX_RETRIES} attempts: {archive_url}", "❌")
-        return None
-    
-    def download_archives_parallel(self, archive_urls, last_downloaded_date=None, max_workers=5):
-        """
-        Downloads multiple archives in parallel for improved performance.
-        Returns a list of successful PGN texts.
-        """
-        pgn_texts = []
-        
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all download tasks
-            future_to_url = {
-                executor.submit(self.download_archive, url, last_downloaded_date): url 
-                for url in archive_urls
-            }
-            
-            # Process completed tasks
-            for future in concurrent.futures.as_completed(future_to_url):
-                url = future_to_url[future]
-                try:
-                    pgn_text = future.result()
-                    if pgn_text:
-                        pgn_texts.append(pgn_text)
-                except Exception as e:
-                    self.log(logging.ERROR, 
-                             f"Exception while downloading {url}: {str(e)}", "❌")
-                    
-        return pgn_texts
-    
-    ################################################################################
-    # V. PUBLIC API
-    ################################################################################
-    def fetch_and_save_games(self):
+    def fetch_and_save_games(self, filters=None):
         """
         Downloads new PGNs from Chess.com and saves them to the archive.
         - Appends new games to the archive file
         - Saves newly fetched games separately in output directory
         - Tracks last download date to avoid duplicates
         
+        Args:
+            filters (dict, optional): Filtering criteria, can include:
+                - start_date (str): Start date in YYYY-MM-DD format
+                - end_date (str): End date in YYYY-MM-DD format
+                - time_control (str): Time control category (bullet, blitz, rapid, classical)
+        
         Returns:
             str or None: Path to the file containing newly downloaded games, or None if no new games
         """
         self.log(logging.INFO, f"Checking for new games for {self.username}...", "🔍")
+        
+        # Log filters if present
+        if filters:
+            filter_list = []
+            if 'start_date' in filters and 'end_date' in filters:
+                filter_list.append(f"Date range: {filters['start_date']} to {filters['end_date']}")
+            if 'time_control' in filters:
+                filter_list.append(f"Time control: {filters['time_control']}")
+            
+            if filter_list:
+                self.log(logging.INFO, f"Applying filters: {', '.join(filter_list)}", "🔍")
         
         archives = self.fetch_archives()
         if not archives:
@@ -217,8 +88,45 @@ class ChessComDownloader:
             
         last_downloaded_date = self.get_last_downloaded_datetime()
         
+        # If date filters are provided, override the last_downloaded_date
+        if filters and 'start_date' in filters:
+            # Convert YYYY-MM-DD to YYYY/MM format
+            try:
+                date_obj = datetime.strptime(filters['start_date'], "%Y-%m-%d")
+                # Convert to YYYY/MM format (used by Chess.com API)
+                filters['start_date_api'] = date_obj.strftime("%Y/%m")
+            except ValueError:
+                self.log(logging.WARNING, f"Invalid start date format: {filters['start_date']}", "⚠️")
+        
+        if filters and 'end_date' in filters:
+            try:
+                date_obj = datetime.strptime(filters['end_date'], "%Y-%m-%d")
+                # Convert to YYYY/MM format (used by Chess.com API)
+                filters['end_date_api'] = date_obj.strftime("%Y/%m")
+            except ValueError:
+                self.log(logging.WARNING, f"Invalid end date format: {filters['end_date']}", "⚠️")
+        
+        # Filter archives by date if date filters are provided
+        if filters and 'start_date_api' in filters:
+            archives = [url for url in archives if self._extract_month(url) >= filters['start_date_api']]
+        
+        if filters and 'end_date_api' in filters:
+            archives = [url for url in archives if self._extract_month(url) <= filters['end_date_api']]
+        
         # Download archives in parallel
         pgn_texts = self.download_archives_parallel(archives, last_downloaded_date)
+        
+        # Filter games by time control if needed
+        if filters and 'time_control' in filters and pgn_texts:
+            filtered_pgn_texts = []
+            
+            for pgn_text in pgn_texts:
+                # Filter games by time control
+                filtered_games = self._filter_games_by_time_control(pgn_text, filters['time_control'])
+                if filtered_games:
+                    filtered_pgn_texts.append(filtered_games)
+            
+            pgn_texts = filtered_pgn_texts
         
         if not pgn_texts:
             self.log(logging.INFO, "No new games found", "ℹ️")
@@ -246,3 +154,100 @@ class ChessComDownloader:
         self.save_last_downloaded_datetime()
         
         return new_pgn_file
+    
+    def _extract_month(self, archive_url):
+        """
+        Extract the month in YYYY/MM format from an archive URL.
+        
+        Args:
+            archive_url (str): Archive URL
+            
+        Returns:
+            str: Month in YYYY/MM format
+        """
+        # URLs are in format: https://api.chess.com/pub/player/{username}/games/{YYYY}/{MM}
+        parts = archive_url.split('/')
+        if len(parts) >= 2:
+            return f"{parts[-2]}/{parts[-1]}"
+        return ""
+    
+    def _filter_games_by_time_control(self, pgn_text, time_control_category):
+        """
+        Filter games in a PGN text by time control category.
+        
+        Args:
+            pgn_text (str): PGN text containing multiple games
+            time_control_category (str): Time control category (bullet, blitz, rapid, classical)
+            
+        Returns:
+            str: Filtered PGN text
+        """
+        # Split the PGN text into individual games
+        games = pgn_text.split('\n\n[Event "')
+        
+        # First element won't start with [Event, so we need to handle it separately
+        header = games[0]
+        games = games[1:]
+        games = ['[Event "' + game for game in games]
+        
+        # Filter games by time control
+        filtered_games = []
+        
+        for game in games:
+            # Extract TimeControl tag
+            time_control_match = re.search(r'\[TimeControl "([^"]+)"\]', game)
+            
+            if time_control_match:
+                tc = time_control_match.group(1)
+                game_category = self._categorize_time_control(tc)
+                
+                # Add game if it matches the requested category
+                if game_category == time_control_category:
+                    filtered_games.append(game)
+            else:
+                # If no TimeControl tag, skip this game
+                continue
+        
+        # If any games were filtered, combine them
+        if filtered_games:
+            return '\n\n'.join(filtered_games)
+        
+        return ""
+    
+    def _categorize_time_control(self, seconds):
+        """
+        Categorize time control into standard categories.
+        
+        Args:
+            seconds (str): Time control in seconds
+            
+        Returns:
+            str: Category (bullet, blitz, rapid, classical)
+        """
+        # Parse the time control
+        base_time = 0
+        
+        try:
+            if isinstance(seconds, str):
+                if '+' in seconds:
+                    parts = seconds.split('+')
+                    base_time = int(parts[0])
+                else:
+                    base_time = int(seconds)
+            else:
+                base_time = int(seconds)
+        except (ValueError, TypeError):
+            return "unknown"
+        
+        # Convert to minutes
+        minutes = base_time / 60
+        
+        # Categorize
+        if minutes < 3:
+            return "bullet"
+        elif minutes < 10:
+            return "blitz"
+        elif minutes < 30:
+            return "rapid"
+        else:
+            return "classical"

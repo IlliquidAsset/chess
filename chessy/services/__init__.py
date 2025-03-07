@@ -27,12 +27,30 @@ class ChessyService:
         self.config = config
         self.logger = logging.getLogger(__name__)
     
-    def check_for_updates(self):
+    def check_for_updates(self, filters=None):
         """
         Check for new games and return the number of new games found.
+        
+        Args:
+            filters (dict, optional): Filtering criteria like date range and time control
+            
+        Returns:
+            int: Number of new games found
         """
         emoji_log(self.logger, logging.INFO, f"Checking for new games for {self.config.USERNAME}...", "🔍")
-        new_pgn_file = self.downloader.fetch_and_save_games()
+        
+        # Apply filters if provided
+        if filters:
+            filter_msg = []
+            if 'start_date' in filters and 'end_date' in filters:
+                filter_msg.append(f"date range: {filters['start_date']} to {filters['end_date']}")
+            if 'time_control' in filters:
+                filter_msg.append(f"time control: {filters['time_control']}")
+            
+            if filter_msg:
+                emoji_log(self.logger, logging.INFO, f"Using filters: {', '.join(filter_msg)}", "🔍")
+        
+        new_pgn_file = self.downloader.fetch_and_save_games(filters=filters)
         
         if new_pgn_file and os.path.exists(new_pgn_file):
             # Count number of games in the file (approximate by counting [Event tags)
